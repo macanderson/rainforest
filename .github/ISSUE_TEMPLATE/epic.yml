@@ -1,0 +1,23 @@
+name: Epic
+description: A tracking issue whose work happens in native sub-issues.
+title: "[Epic]: "
+labels: ["epic"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What this epic delivers as a whole, and any Goal-A proof events assigned to it.
+      placeholder: What body of work does this epic track?
+    validations:
+      required: true
+  - type: textarea
+    id: sub-issues
+    attributes:
+      label: Sub-issue checklist
+      description: One checkbox per sub-issue; keep in sync as sub-issues are created and closed.
+      placeholder: |
+        - [ ] #N — sub-issue title
+        - [ ] #N — sub-issue title
+    validations:
+      required: true

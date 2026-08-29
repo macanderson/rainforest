@@ -1,0 +1,42 @@
+name: Feature
+description: A single unit of work — one issue, one PR.
+title: "[Feature]: "
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Purpose
+      description: One or two sentences on what this delivers and why.
+      placeholder: What does this issue deliver, and why does the demo need it?
+    validations:
+      required: true
+  - type: textarea
+    id: spec-links
+    attributes:
+      label: Spec links
+      description: Repo-relative links to the governing specs (docs/, RAINFOREST.md, data/numbers-bible.json).
+      placeholder: |
+        - docs/architecture.md
+        - docs/data-specs/orders.md
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance checklist
+      description: Verifiable checkboxes. The issue closes only when every box is checked.
+      placeholder: |
+        - [ ] Typecheck, lint, and unit tests green
+        - [ ] `pnpm reconcile` green (if data is touched)
+        - [ ] Screenshot committed to the PR (if UI is touched)
+    validations:
+      required: true
+  - type: input
+    id: blocked-by
+    attributes:
+      label: Blocked by
+      description: "Issue numbers this depends on, e.g. `Blocked by: #12, #14`. Leave empty if unblocked."
+      placeholder: "Blocked by: #N"
+    validations:
+      required: false
