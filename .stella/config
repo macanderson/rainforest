@@ -1,0 +1,25 @@
+# .stella/config — repo-scoped Stella configuration for the Rainforest build
+#
+# DO NOT EDIT OR DISABLE THIS FILE (see AGENTS.md §5, hook 2). It is part of
+# the Goal-A proof run: this repo is the live integration test for Stella's
+# self-improvement capabilities, and these values are deliberately tuned so
+# the proof events fire during the build.
+#
+# This file references Stella capability A2 (configurable gap-detection
+# thresholds, issue #2471): GapDetectionConfig values become readable from the
+# repo-scoped `.stella/` config, overriding the defaults in
+# `~/.config/stella/`. Until A2 lands in Stella, this file is an inert stub —
+# the keys below document the intended overrides and take effect the moment
+# the A2 config loader ships.
+
+[tool_foundry.gap_detection]
+# Lowered from the default so that repeated command shapes (seed generation,
+# CSV inspection, sqlite queries) trip gap detection EARLY during epic E3 —
+# the RF-P1 proving stage. The default is intentionally conservative for
+# everyday use; this experiment wants detection to fire fast and visibly.
+min_occurrences = 2
+
+# Keep proposals flowing to the ledger as soon as the threshold is met; a gap
+# row in .stella/private/tool_gaps.jsonl is RF-P1 evidence (a).
+# (Shape-similarity thresholds keep their defaults — only the occurrence
+# floor is lowered for this experiment.)
