@@ -14,8 +14,9 @@ autonomous delivery. Both halves matter. See `README.md` for the premise and
 
 ## 1. Issue workflow
 
-1. **Pick only issues labeled `status:ready`.** Never pick `status:blocked` or
-   `needs-human` issues.
+1. **Pick only issues labeled `status:ready`.** Never pick `status:blocked`
+   issues. There is no class of issue reserved for a person: every step in
+   this repo's process is performed by an agent.
 2. **Respect blocker lines.** Dependencies are encoded as a literal,
    machine-greppable line in the issue body:
 
@@ -61,7 +62,10 @@ A PR is not done until **all** of the following hold:
   local one.
 - PR title mirrors the issue title. PR body: issue reference, what changed,
   DoD checklist (§2), screenshot slot for UI work.
-- CI must be green before a PR is marked ready. Humans merge.
+- **One issue = one PR, and the PR merges itself.** Enable auto-merge when you
+  open the PR (`gh pr merge --auto <N>`); it merges the moment CI is green.
+  There is no human review gate and no human merge authority — CI is the
+  reviewer. If CI is red, fix it on the branch; never bypass it.
 
 ## 4. The palette rule — this is law
 
@@ -87,12 +91,19 @@ capabilities. Three behaviors are part of the experiment, not accidents:
    the tool foundry watches.** Repeated seed/CSV/sqlite inspection commands are
    supposed to trip gap detection during epic E3. Do not suppress the
    repetition, do not hand-roll a wrapper script to hide it, and do not treat
-   the gap-detection notice as noise. Let the foundry propose; a human adopts.
-2. **Never disable or edit `.stella/` configuration.** The thresholds in
-   `.stella/config` are deliberately tuned for this experiment (see the file's
-   comments). Changing them, deleting them, or working around them invalidates
-   the proof run. If a threshold seems wrong, say so in a `triage` issue — do
-   not touch the file.
+   the gap-detection notice as noise. The foundry then builds and equips the
+   tool **autonomously** — detected gaps are authored, validated under
+   network denial, adopted, and enabled by Stella itself (Stella ADR 0023).
+   There is no adoption step for anyone to perform, and you must not perform
+   one by hand: never run `stella tools --adopt` / `--enable`, and never
+   write a tool into `.stella/tools/` yourself. Safety is the standing
+   controls — network denial, versioned rollback, per-launch telemetry, the
+   circuit breaker — not a reviewer.
+2. **Never disable or edit `stella.toml` or anything under `.stella/`.** The
+   `[foundry]` block in `stella.toml` at the repo root is deliberately tuned
+   for this experiment (see the file's comments). Changing it, deleting it, or
+   working around it invalidates the proof run. If a threshold seems wrong,
+   say so in a `triage` issue — do not touch the file.
 3. **Skills mined from this build are part of the experiment.** Reflections,
    mined skills under `.stella/skills/`, promotions, appraisals, and demotions
    generated while building Rainforest are proof artifacts. Do not prune,
@@ -120,6 +131,7 @@ owns those).
   never invent or alter a named entity, date, or figure.
 - This repo's fiction never names real companies or people as actors or
   competitors.
-- No secrets in the repo, ever. Deployment secrets live on the host
-  (`needs-human` issues cover those steps).
+- No secrets in the repo, ever. Deployment secrets live on the host, placed
+  there by the provisioning script (E7#2, #18); nothing in this repo waits on
+  a person to enter one.
 - When in doubt about scope: do what the issue says, file residue for the rest.

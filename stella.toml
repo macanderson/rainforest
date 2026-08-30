@@ -1,0 +1,56 @@
+# stella.toml — repo-scoped Stella configuration for the Rainforest build
+#
+# DO NOT EDIT OR DISABLE THIS FILE (see AGENTS.md §5, hook 2). It is part of
+# the Goal-A proof run: this repo is the live integration test for Stella's
+# self-improvement capabilities, and these values are deliberately tuned so
+# the proof events fire during the build.
+#
+# Stella reads repo-scoped configuration from `<workspace>/stella.toml` (this
+# file) or its JSON twin `<workspace>/.stella/settings.json`; the two are the
+# same contract. The `[foundry]` block below is the one that shipped with the
+# autonomous tool foundry (Stella ADR 0023, PR macanderson/stella#5476 —
+# `crates/stella-cli/src/settings/foundry.rs`, documented under
+# "Configuration → stella.toml → [foundry]" on the Stella site). The block is
+# whole-block last-wins across scopes: a scope that declares it states the
+# entire policy, so every key is written out here even where it keeps the
+# shipped default.
+
+[foundry]
+# --- Gap detection (A2) ------------------------------------------------------
+# Lowered so that repeated command shapes (seed generation, CSV inspection,
+# sqlite queries) trip detection EARLY during epic E3 — the RF-P1 proving
+# stage. The shipped floor (3 occurrences × 3.0 reuse ratio) is deliberately
+# conservative for everyday use; this experiment wants detection to fire fast
+# and visibly. A gap row in .stella/private/tool_gaps.jsonl is RF-P1 evidence.
+min_occurrences = 2          # shipped default 3; 0 or 1 disables detection
+min_distinct_arguments = 2   # shipped default kept — 1 would fight loop detection
+min_reuse_ratio = 1.0        # shipped default 3.0; at or below 1.0 disables the reuse gate
+require_success = true       # shipped default — a shape that never worked is not a tool
+max_examples = 3             # shipped default — the authored tool's witness input is built from these
+
+# --- Autonomy (A3) -----------------------------------------------------------
+# Fully on: detect → auto-author → validate (manifest re-parse, static lint,
+# capability witness executed under OS-level network denial) → auto-adopt →
+# auto-enable → execute through the foundry gate. There is no human adoption
+# or enablement step anywhere in this pipeline. "draft-only" (author and
+# validate, adopt nothing) and "off" (detect and ledger only) exist as the
+# kill switch; neither is used in this build. Stella also degrades to
+# draft-only by itself on a host with no working network isolation — if that
+# notice appears, the proof host is wrong, not this file.
+autonomy = "auto"
+
+# --- Circuit breaker ---------------------------------------------------------
+# Shipped defaults, stated explicitly because the block is whole-block
+# last-wins. A tool that fails 3 launches in a row, or more than half of its
+# last 10, is auto-disabled with a recorded reason; a new version (re-author
+# or `stella tools --rollback`) re-enables it. Tripping the breaker on purpose
+# is RF-P1 step 6.
+breaker_consecutive_failures = 3
+breaker_window = 10
+breaker_failure_rate = 0.5
+
+# --- Network -----------------------------------------------------------------
+# Empty: every foundry-built tool spawns with the network denied
+# (macOS sandbox-exec, Linux unshare -r -n). Nothing built during this
+# experiment needs the network, and no tool is granted it.
+network_allowlist = []
