@@ -54,3 +54,22 @@ breaker_failure_rate = 0.5
 # (macOS sandbox-exec, Linux unshare -r -n). Nothing built during this
 # experiment needs the network, and no tool is granted it.
 network_allowlist = []
+
+[context.retrieval]
+# --- A/B recall control rate (RF-P2 throughput) -----------------------------
+# Every Nth turn in this workspace runs with recall suppressed (no memories,
+# skills, or records injected) so the two arms' outcomes can be compared —
+# the measured-lift / demotion verdicts of stella#5487. The key is an
+# integer divisor, not a fraction: the shipped default is 10 (one control
+# turn in ten, a 0.1 rate); `2` makes every second turn a control turn (a
+# 0.5 rate), which raises the verdict throughput five-fold over the default
+# so RF-P2 proofs fire within this build instead of needing hundreds of
+# turns. `0` or `1` would disable the control. Workspace-local: this is a
+# proving-ground choice, not a recommended everyday setting — a normal
+# workspace pays 50% of its turns unsteered under it.
+#
+# `[context]` is whole-block last-wins across scopes, so declaring this
+# table here replaces any user-global `[context]` block for this workspace;
+# every other `[context.*]` key keeps its shipped default (all of them are
+# serde-defaulted in crates/stella-cli/src/settings/context.rs).
+ab_recall_rate = 2
