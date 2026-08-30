@@ -66,6 +66,10 @@ A PR is not done until **all** of the following hold:
   open the PR (`gh pr merge --auto <N>`); it merges the moment CI is green.
   There is no human review gate and no human merge authority — CI is the
   reviewer. If CI is red, fix it on the branch; never bypass it.
+  - GitHub only auto-merges when `main` carries a required check; that
+    protection is part of the CI pipeline issue (#25). Until #25 lands, the
+    agent that opened the PR merges it itself once the §2 checklist passes
+    (`gh pr merge --squash <N>`) — still no person in the loop.
 
 ## 4. The palette rule — this is law
 
