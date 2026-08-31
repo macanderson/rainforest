@@ -9,7 +9,7 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 
-import * as schema from "./schema";
+import * as schema from "./schema.ts";
 
 export const DEFAULT_DATABASE_PATH = "./data/rainforest.db";
 

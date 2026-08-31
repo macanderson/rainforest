@@ -13,9 +13,9 @@ const dbPath = join(dir, "test.db");
 after(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("db/migrate — migration runner", () => {
-  it("applies the initial migration cleanly to a fresh database", () => {
+  it("applies the migrations cleanly to a fresh database", () => {
     const applied = runMigrations(dbPath);
-    assert.deepEqual(applied, ["0000_init"]);
+    assert.deepEqual(applied, ["0000_init", "0001_core_schema"]);
 
     const sqlite = new Database(dbPath);
     const table = sqlite
@@ -27,8 +27,13 @@ describe("db/migrate — migration runner", () => {
     assert.match(table.sql, /updated_at/);
     assert.match(table.sql, /CHECK\(data_origin in \('seed', 'demo', 'agent'\)\)/);
 
-    const rows = sqlite.prepare("SELECT tag, data_origin FROM drizzle_migrations").all();
-    assert.deepEqual(rows, [{ tag: "0000_init", data_origin: "seed" }]);
+    const rows = sqlite
+      .prepare("SELECT tag, data_origin FROM drizzle_migrations ORDER BY tag")
+      .all();
+    assert.deepEqual(rows, [
+      { tag: "0000_init", data_origin: "seed" },
+      { tag: "0001_core_schema", data_origin: "seed" },
+    ]);
     sqlite.close();
   });
 
