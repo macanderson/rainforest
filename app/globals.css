@@ -2,11 +2,17 @@
 
 /*
  * Locked black/white/red token sheet — docs/architecture.md §2.
- * Tailwind v4: the default palette is stripped by defining ONLY these
- * --color-* tokens. No other color utility can be generated.
  * Values mirror lib/tokens.ts exactly; the palette lint rule enforces both.
+ *
+ * `--color-*: initial` clears Tailwind's default color namespace before the
+ * sheet is declared. Without it `@theme` *extends* the defaults rather than
+ * replacing them, and `bg-blue-500` still compiles to real CSS — declaring
+ * only these tokens does not strip anything on its own.
  */
 @theme {
+  /* Drop every default hue; only what follows can generate a color utility. */
+  --color-*: initial;
+
   /* 2.1 Core — pure black, pure white */
   --color-black: #000000;
   --color-white: #ffffff;
