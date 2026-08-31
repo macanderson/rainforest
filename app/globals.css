@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/*
+ * Locked black/white/red token sheet — docs/architecture.md §2.
+ * Tailwind v4: the default palette is stripped by defining ONLY these
+ * --color-* tokens. No other color utility can be generated.
+ * Values mirror lib/tokens.ts exactly; the palette lint rule enforces both.
+ */
+@theme {
+  /* 2.1 Core — pure black, pure white */
+  --color-black: #000000;
+  --color-white: #ffffff;
+
+  /* 2.2 Red scale — accent only: alerts, CTAs, deltas, low-stock flags */
+  --color-red-900: #7f1d1d;
+  --color-red-800: #991b1b;
+  --color-red-700: #b91c1c;
+  --color-red-600: #dc2626;
+  --color-red-500: #ef4444;
+  --color-red-400: #f87171;
+  --color-red-300: #fca5a5;
+
+  /* 2.3 Grey scale — chrome: borders, secondary text, zebra, disabled */
+  --color-grey-900: #111827;
+  --color-grey-800: #1f2937;
+  --color-grey-700: #374151;
+  --color-grey-600: #4b5563;
+  --color-grey-500: #6b7280;
+  --color-grey-400: #9ca3af;
+  --color-grey-300: #d1d5db;
+  --color-grey-200: #e5e7eb;
+  --color-grey-100: #f3f4f6;
+  --color-grey-50: #f9fafb;
+}
+
+body {
+  background-color: var(--color-white);
+  color: var(--color-black);
+}
