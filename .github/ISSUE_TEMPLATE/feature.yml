@@ -32,11 +32,11 @@ body:
         - [ ] Screenshot committed to the PR (if UI is touched)
     validations:
       required: true
-  - type: input
+  - type: textarea
     id: blocked-by
     attributes:
       label: Blocked by
-      description: "Issue numbers this depends on, e.g. `Blocked by: #12, #14`. Leave empty if unblocked."
+      description: "Dependencies as machine-greppable lines, one per line: `Blocked by: #N`. Leave empty if unblocked. An issue is ready only when every referenced blocker is closed."
       placeholder: "Blocked by: #N"
     validations:
       required: false

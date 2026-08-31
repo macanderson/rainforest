@@ -4,10 +4,10 @@ title: "[Epic]: "
 labels: ["epic"]
 body:
   - type: textarea
-    id: summary
+    id: scope
     attributes:
-      label: Summary
-      description: What this epic delivers as a whole, and any Goal-A proof events assigned to it.
+      label: Scope
+      description: What this epic delivers as a whole, and any Goal-A proof events assigned to it. Work happens in the sub-issues, never directly against this issue.
       placeholder: What body of work does this epic track?
     validations:
       required: true
