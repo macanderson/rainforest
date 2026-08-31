@@ -74,11 +74,54 @@ const COLOR_CLASS_RE = new RegExp(
   `^(?:${COLOR_PREFIXES.join("|")})-([a-z]+)(?:-(\\d{2,3}))?$`,
 );
 
+// A Tailwind arbitrary value on a color prefix: bg-[#123456], border-[red].
+// Clearing the theme's color namespace does not reach these — Tailwind builds
+// the declaration from the bracket, not from a token — so they are the one way
+// an off-palette color still compiles, and this rule is what stops them.
+const ARBITRARY_RE = new RegExp(
+  `^(?:${COLOR_PREFIXES.join("|")})-\\[(.+)\\]$`,
+);
+
 // Any hex literal of 3, 4, 6, or 8 digits.
 const HEX_RE = /#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/g;
 
 // CSS color functions other than the locked hex sheet.
 const COLOR_FN_RE = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\s*\(/gi;
+
+/**
+ * Whether an arbitrary value is a color rather than a length.
+ *
+ * `text-[14px]` and `border-[2px]` share their prefixes with color utilities
+ * and are perfectly legal, so the prefix cannot decide this on its own — the
+ * bracket has to. A named color is bare letters; every size carries a digit or
+ * a unit, which is what keeps the two apart.
+ */
+function isColorValue(content) {
+  const inner = content.trim();
+  if (inner.startsWith("#")) return true;
+  if (COLOR_FN_RE.test(inner)) {
+    COLOR_FN_RE.lastIndex = 0;
+    return true;
+  }
+  if (/^color:/i.test(inner)) return true;
+  return /^[a-zA-Z]+$/.test(inner);
+}
+
+/**
+ * Drop `hover:` / `md:` prefixes without splitting an arbitrary value that
+ * contains its own colon — `fill-[color:var(--x)]` is one token, and a naive
+ * split on ":" hands back `var(--x)]`.
+ */
+function stripVariants(token) {
+  let depth = 0;
+  for (let i = 0; i < token.length; i += 1) {
+    const ch = token[i];
+    if (ch === "[") depth += 1;
+    else if (ch === "]") depth -= 1;
+    else if (ch === ":" && depth === 0) return stripVariants(token.slice(i + 1));
+  }
+  return token;
+}
 
 function normalizeHex(hex) {
   let h = hex.toLowerCase();
@@ -122,8 +165,28 @@ function checkStringValue(value, node, context, seen) {
   //    including variant-prefixed ones (hover:bg-blue-500, md:text-red-100).
   for (const rawToken of value.split(/\s+/)) {
     const token = rawToken.replace(/\/\d{1,3}$/, ""); // strip opacity modifier
-    const segment = token.split(":").pop();
+    const segment = stripVariants(token);
     if (!segment) continue;
+
+    // 4. Arbitrary values on a color prefix. Only a locked hex is admitted;
+    //    a named color, a color function or a `color:` reference is not.
+    const arbitrary = ARBITRARY_RE.exec(segment);
+    if (arbitrary) {
+      const inner = arbitrary[1].trim();
+      const admitted =
+        /^#[0-9a-fA-F]{3,8}$/.test(inner) &&
+        allowedHexColors.has(normalizeHex(inner));
+      if (isColorValue(inner) && !admitted && !seen.has(node)) {
+        seen.add(node);
+        context.report({
+          node,
+          messageId: "offPaletteArbitrary",
+          data: { className: segment },
+        });
+      }
+      continue;
+    }
+
     const m = COLOR_CLASS_RE.exec(segment);
     if (!m) continue;
     // A bare family name (bg-black) is a color; a family with a numeric
@@ -156,6 +219,8 @@ const rule = {
         "Tailwind color class '{{className}}' is outside the locked token sheet. Only black, white, red-300…red-900 and grey-50…grey-900 are permitted.",
       offPaletteFunction:
         "CSS color function '{{fn}}' is not permitted; use the locked hex tokens only.",
+      offPaletteArbitrary:
+        "Arbitrary color utility '{{className}}' bypasses the locked token sheet. Tailwind builds these from the bracket, so the theme cannot reject them — use a locked utility (bg-red-600, text-grey-700) instead.",
     },
     schema: [],
   },
