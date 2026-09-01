@@ -144,6 +144,8 @@ const RAW_INSERT_ALLOWLIST: Record<string, string> = {
   "tests/demo-wipe.test.mjs": "seeds wipe/restore fixtures across tables with raw SQL",
   "tests/clock-shift.test.mjs": "seeds clock-shift fixtures across tables with raw SQL",
   "tests/reconcile.test.mjs": "seeds catalog fixtures with raw SQL to aggregate against the bible",
+  "tests/jobs-observability.test.mjs":
+    "seeds job_run_ledger/job_runs fixtures with raw SQL to test the observability reads",
 };
 
 const RAW_INSERT_PATTERNS = [
