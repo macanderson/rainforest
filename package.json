@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
+    "test:palette-build": "node --test tests/palette-reset.build.mjs",
     "seed": "node lib/seed.mjs",
     "reconcile": "node lib/reconcile.mjs",
     "db:generate": "drizzle-kit generate",

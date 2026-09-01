@@ -44,6 +44,9 @@ A PR is not done until **all** of the following hold:
 - [ ] Typecheck passes (`pnpm typecheck` or the repo's equivalent once scaffolded).
 - [ ] Lint passes with zero warnings.
 - [ ] Unit tests pass; new logic ships with new tests.
+- [ ] The palette build-output test passes (`npm run test:palette-build`) — it
+      is the only check that sees emitted CSS, so it is the only one that
+      catches a broken `--color-*: initial` reset in `app/globals.css`.
 - [ ] **`pnpm reconcile` is green whenever data is touched** — any change under
       `data/`, any seed generator, any migration, any job that mutates seeded
       rows. Reconciliation drift against `data/numbers-bible.json` (±2%) is a
