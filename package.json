@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
+    "reconcile": "node lib/reconcile.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node lib/db/migrate.mjs",
     "reconcile": "node lib/reconcile.mjs"
