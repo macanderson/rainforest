@@ -14,6 +14,10 @@
  * 2. **Wipe.** All `data_origin='demo'` rows are deleted in dependency
  *    order (children before parents) so the delete is cascade-safe even
  *    where FKs are RESTRICT. `seed` and `agent` rows are never touched.
+ *    `audit_log` is append-only (architecture §9.3): its demo rows are
+ *    archived into `demo_wipe_audit_archive` before deletion, so the trail
+ *    survives the wipe it describes and the database triggers that reject
+ *    DELETE on `audit_log` are never tripped.
  * 3. **Postcondition.** `reconcile()` must be green on the wiped database
  *    or the whole transaction rolls back — the next demo never starts from
  *    a drifted database.
@@ -29,12 +33,13 @@ import { reconcile, type BibleRow, type ReconcileReport } from "../reconcile.ts"
 
 /**
  * Wipe order: children before parents so no delete ever dangles a FK, even
- * on the RESTRICT relations. `audit_log` and `agent_actions` have no
- * outbound FKs and can go first; `job_runs` is the ledger itself and is
- * wiped last (its rows are origin-stamped like everything else).
+ * on the RESTRICT relations. `agent_actions` has no outbound FKs and goes
+ * first; `job_runs` is the ledger itself and is wiped last (its rows are
+ * origin-stamped like everything else). `audit_log` is deliberately absent:
+ * it is append-only (architecture §9.3), so its demo rows are archived to
+ * `demo_wipe_audit_archive` before the wipe loop instead of deleted.
  */
 export const WIPE_ORDER = [
-  "audit_log",
   "agent_actions",
   "support_tickets",
   "shipments",
@@ -184,6 +189,39 @@ interface WipeBody {
   reconcile: { ok: boolean; dbHalf: ReconcileReport["dbHalf"] };
 }
 
+/**
+ * Archive every `data_origin='demo'` audit_log row into
+ * `demo_wipe_audit_archive`, then delete the originals. `audit_log` is
+ * append-only (architecture §9.3) and migration 0005's triggers reject
+ * UPDATE/DELETE on it — the no-delete trigger permits deletion only while
+ * the `audit_log_delete_gate` row is open, and this function is the only
+ * code that opens it (inside the wipe transaction, so a rolled-back wipe
+ * closes the gate with it). Returns the number of rows archived.
+ */
+function archiveDemoAuditRows(sqlite: Sqlite): number {
+  const { n } = sqlite
+    .prepare("SELECT COUNT(*) n FROM audit_log WHERE data_origin = 'demo'")
+    .get() as { n: number };
+  if (n === 0) return 0;
+  sqlite
+    .prepare(
+      `INSERT INTO demo_wipe_audit_archive
+         (id, actor, action, entity_table, entity_id, before_json, after_json,
+          reason, data_origin, created_at, updated_at, archived_at)
+       SELECT id, actor, action, entity_table, entity_id, before_json, after_json,
+              reason, data_origin, created_at, updated_at, ?
+       FROM audit_log WHERE data_origin = 'demo'`,
+    )
+    .run(Date.now());
+  sqlite.prepare("UPDATE audit_log_delete_gate SET open = 1 WHERE id = 1").run();
+  try {
+    sqlite.prepare("DELETE FROM audit_log WHERE data_origin = 'demo'").run();
+  } finally {
+    sqlite.prepare("UPDATE audit_log_delete_gate SET open = 0 WHERE id = 1").run();
+  }
+  return n;
+}
+
 /** The wipe itself. Throws if the reconcile postcondition is red. */
 function wipeBody(
   sqlite: Sqlite,
@@ -193,8 +231,12 @@ function wipeBody(
   // Phase 1 — restore seed rows mutated since the last snapshot.
   const rowsRestored = restoreFromSnapshot(sqlite, startedAt);
 
-  // Phase 2 — delete every demo row, children before parents.
+  // Phase 2 — delete every demo row, children before parents. audit_log is
+  // append-only (§9.3): archive its demo rows first, then delete them via a
+  // session variable the no-delete trigger recognizes as the wipe's own.
+  const archived = archiveDemoAuditRows(sqlite);
   const rowsWiped: Record<string, number> = {};
+  if (archived > 0) rowsWiped.audit_log = archived;
   for (const table of WIPE_ORDER) {
     const { changes } = sqlite
       .prepare(`DELETE FROM ${table} WHERE data_origin = 'demo'`)

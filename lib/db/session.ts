@@ -130,6 +130,10 @@ const SKIP_DIRS = new Set([
  * Everything else in the repo must write through `insertRow`.
  */
 const RAW_INSERT_ALLOWLIST: Record<string, string> = {
+  "lib/db/audit.ts":
+    "the audit-trail mutation chokepoint itself (architecture §9.3): createRow/updateRow/deleteRow " +
+    "are the single write path for domain mutations and write the audit_log row in the same " +
+    "transaction — the .insert/.update/.delete call sites here ARE the sanctioned write path",
   "lib/db/migrate.mjs": "migration runner; ledger rows are stamped 'seed' explicitly",
   "tests/db-migrate.test.mjs": "exercises the runner and the CHECK constraint directly",
   "tests/db-schema.test.mjs": "exercises DDL/cascade behavior with raw SQL fixtures",
