@@ -14,27 +14,22 @@
  *
  * The nightly demo-wipe job (E6#3) runs `reconcile()` as a postcondition so
  * the next demo starts from a bible-true database.
+ * The bible-internal half consumes the typed loader from
+ * `lib/numbers-bible.ts` (E2#2) — the only module that reads the JSON
+ * directly — so a bible that violates I1/I2 fails at load, before any check
+ * runs.
  */
 import type Database from "better-sqlite3";
-import { readFileSync } from "node:fs";
 
-export interface BibleRow {
-  quarter: string;
-  gmv_usd_m: number;
-  revenue_usd_m: number;
-  gross_margin_pct: number;
-  net_income_usd_m: number;
-  orders_k: number;
-  aov_usd: number;
-  active_customers_k: number;
-  first_party_share_pct: number;
-  marketplace_take_rate_pct: number;
-  fulfillment_cost_per_order_usd: number;
-  on_time_delivery_pct: number;
-  tickets_per_1k_orders: number;
-  landed_cost_index_electronics: number;
-  headcount: number;
-}
+import {
+  checkIdentityDiagnostics,
+  checkStructureDiagnostics,
+  loadNumbersBible,
+  type QuarterRow,
+} from "./numbers-bible.ts";
+
+/** @deprecated Use `QuarterRow` from `lib/numbers-bible.ts`. */
+export type BibleRow = QuarterRow;
 
 export interface ReconcileFinding {
   check: string;
@@ -49,16 +44,13 @@ export interface ReconcileReport {
   findings: ReconcileFinding[];
 }
 
-/** Load and minimally validate the numbers bible. */
-export function loadBible(
-  path: string = new URL("../data/numbers-bible.json", import.meta.url)
-    .pathname,
-): BibleRow[] {
-  const rows = JSON.parse(readFileSync(path, "utf8")) as BibleRow[];
-  if (!Array.isArray(rows) || rows.length === 0) {
-    throw new Error(`numbers bible at ${path} is empty or not an array`);
-  }
-  return rows;
+/**
+ * Load and validate the numbers bible. Delegates to the E2#2 loader, which
+ * Zod-validates every row and throws `BibleValidationError` if the structure
+ * or the I1/I2 identities are violated — a broken bible fails the build here.
+ */
+export function loadBible(path?: string): QuarterRow[] {
+  return loadNumbersBible(path);
 }
 
 function within(actual: number, expected: number, tolerancePct: number) {
@@ -67,51 +59,25 @@ function within(actual: number, expected: number, tolerancePct: number) {
 }
 
 /** §1 — bible-internal identities I1/I2 plus the story-beat guards. */
-export function checkBibleIdentities(bible: BibleRow[]): ReconcileFinding[] {
+export function checkBibleIdentities(bible: QuarterRow[]): ReconcileFinding[] {
   const findings: ReconcileFinding[] = [];
   const byQuarter = new Map(bible.map((r) => [r.quarter, r]));
 
   // Structural: exactly 23 rows, 2021-Q1 → 2026-Q3, unique quarters.
-  if (bible.length !== 23) {
-    findings.push({
-      check: "structure",
-      message: `bible has ${bible.length} rows, expected 23`,
-    });
+  for (const message of checkStructureDiagnostics(bible)) {
+    findings.push({ check: "structure", message });
   }
-  if (new Set(bible.map((r) => r.quarter)).size !== bible.length) {
-    findings.push({ check: "structure", message: "duplicate quarter tags" });
-  }
-  if (bible[0]?.quarter !== "2021-Q1" || bible.at(-1)?.quarter !== "2026-Q3") {
+
+  // I1/I2 per row (±1%) — the same identities the loader enforces at load.
+  for (const message of checkIdentityDiagnostics(bible)) {
     findings.push({
-      check: "structure",
-      message: `span is ${bible[0]?.quarter} → ${bible.at(-1)?.quarter}, expected 2021-Q1 → 2026-Q3`,
+      check: message.startsWith("I1") ? "I1" : "I2",
+      quarter: message.match(/\d{4}-Q[1-4]/)?.[0],
+      message,
     });
   }
 
   for (const row of bible) {
-    // I1: orders_k × aov_usd ≈ gmv_usd_m × 1000 (±1%).
-    const impliedGmv = (row.orders_k * row.aov_usd) / 1000;
-    if (!within(impliedGmv, row.gmv_usd_m, 1)) {
-      findings.push({
-        check: "I1",
-        quarter: row.quarter,
-        message: `orders×AOV implies GMV ${impliedGmv.toFixed(1)}M vs bible ${row.gmv_usd_m}M`,
-      });
-    }
-
-    // I2: revenue ≈ gmv×1P% + take_rate×gmv×(1−1P%) (±1%).
-    const share = row.first_party_share_pct / 100;
-    const impliedRevenue =
-      row.gmv_usd_m * share +
-      (row.marketplace_take_rate_pct / 100) * row.gmv_usd_m * (1 - share);
-    if (!within(impliedRevenue, row.revenue_usd_m, 1)) {
-      findings.push({
-        check: "I2",
-        quarter: row.quarter,
-        message: `1P+3P split implies revenue ${impliedRevenue.toFixed(1)}M vs bible ${row.revenue_usd_m}M`,
-      });
-    }
-
     // I3 (partial): implied opex must be positive on every row. The ±2%
     // match against the E2#4 opex model arms when that model lands.
     const impliedOpex =
@@ -182,7 +148,7 @@ export function checkBibleIdentities(bible: BibleRow[]): ReconcileFinding[] {
  */
 export function checkDbAgainstBible(
   sqlite: Pick<Database.Database, "prepare">,
-  bible: BibleRow[],
+  bible: QuarterRow[],
 ): { half: "armed" | "skipped"; findings: ReconcileFinding[] } {
   void bible; // the D1–D6 diffs consume it once the E3 generators land
   const row = sqlite
@@ -206,7 +172,7 @@ export function checkDbAgainstBible(
 /** Run both halves. `sqlite` is optional; omit it for the bible-only check. */
 export function reconcile(
   sqlite?: Parameters<typeof checkDbAgainstBible>[0],
-  bible: BibleRow[] = loadBible(),
+  bible: QuarterRow[] = loadBible(),
 ): ReconcileReport {
   const findings = checkBibleIdentities(bible);
   let dbHalf: ReconcileReport["dbHalf"] = "skipped";
