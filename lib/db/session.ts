@@ -121,6 +121,7 @@ const SKIP_DIRS = new Set([
   ".git",
   ".next",
   ".stella",
+  ".worktrees", // git worktrees cut inside the checkout are copies of this tree
   "drizzle", // generated SQL migrations, applied only by the runner
 ]);
 
