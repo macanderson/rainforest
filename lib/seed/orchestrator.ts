@@ -20,8 +20,9 @@
  * - **Idempotent wipe-and-reseed.** Before generating, the orchestrator
  *   deletes every `data_origin='seed'` row in FK-safe order (children
  *   before parents, reusing the demo-wipe ordering) plus the seed rows of
- *   the job ledgers, so a re-run leaves no duplicates and no orphans.
- *   `demo` and `agent` rows are never touched.
+ *   the job ledgers, and resets each wiped table's AUTOINCREMENT sequence,
+ *   so a re-run leaves no duplicates, no orphans, and byte-identical
+ *   contents — rowids included. `demo` and `agent` rows are never touched.
  * - **Quarter-tagged.** Every seeded row carries `data_origin='seed'`,
  *   `created_at`/`updated_at` (shared column defaults), and a quarter tag
  *   relative to the DEMO_EPOCH anchor — reconciliation buckets by tag, so
@@ -154,6 +155,22 @@ export function wipeSeedRows(
       wiped += sqlite
         .prepare(`DELETE FROM ${ledger} WHERE data_origin = 'seed'`)
         .run().changes;
+    }
+    // Reset AUTOINCREMENT sequences for fully-wiped tables so a reseed
+    // reproduces the same rowids — without this, determinism holds only
+    // for the first run on a fresh database. A table that still holds
+    // demo/agent rows keeps its sequence (resetting it could reissue an
+    // id those rows' FKs already reference).
+    const sequences = sqlite
+      .prepare("SELECT name FROM sqlite_sequence")
+      .all() as { name: string }[];
+    for (const table of [...tables, "job_runs", "job_run_ledger"]) {
+      const remaining = sqlite
+        .prepare(`SELECT COUNT(*) AS n FROM ${table}`)
+        .get() as { n: number };
+      if (remaining.n === 0 && sequences.some((s) => s.name === table)) {
+        sqlite.prepare("DELETE FROM sqlite_sequence WHERE name = ?").run(table);
+      }
     }
   });
   run();

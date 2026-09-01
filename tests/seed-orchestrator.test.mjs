@@ -107,11 +107,13 @@ describe("seed orchestrator (issue #20, E3#1)", () => {
   it("is idempotent: a double run reseeds cleanly with no duplicates", () => {
     const { sqlite } = freshDb("idem.db");
     runSeed(sqlite, { seed: 7, generators: builtinGenerators() });
+    const firstDigest = seedDigest(sqlite);
     const firstCounts = seedCounts(sqlite);
     const second = runSeed(sqlite, { seed: 7, generators: builtinGenerators() });
     assert.ok(second.wipedRows > 0, "second run must wipe the first run's rows");
-    // Same table counts and no duplicates: unique codes still hold exactly
-    // once per table after the reseed.
+    // The wipe resets AUTOINCREMENT sequences, so the reseed reproduces the
+    // first run exactly — rowids included.
+    assert.equal(seedDigest(sqlite), firstDigest);
     assert.deepEqual(seedCounts(sqlite), firstCounts);
     for (const [table, column] of [
       ["suppliers", "code"],
