@@ -10,7 +10,10 @@
  * only these tokens does not strip anything on its own.
  */
 @theme {
-  /* Drop every default hue; only what follows can generate a color utility. */
+  /* Drop every default hue; only what follows can generate a *named* color
+   * utility. An arbitrary value builds its declaration from the bracket
+   * rather than from a token, so `bg-[red]` compiles whatever the theme
+   * says — the palette lint rule is what rejects those. */
   --color-*: initial;
 
   /* 2.1 Core — pure black, pure white */

@@ -32,6 +32,11 @@ describe("palette/no-off-palette-colors", () => {
         // Non-color utilities are untouched
         { code: 'const c = "flex min-h-screen rounded-lg px-4 py-2 text-sm";' },
         { code: 'const n = 42;' },
+        // Arbitrary *sizes* share the color prefixes and stay legal
+        { code: 'const c = "text-[14px] border-[2px] w-[32rem]";' },
+        { code: 'const c = "shadow-[0_1px_2px] outline-[3px]";' },
+        // An arbitrary value naming a locked hex is admitted
+        { code: 'const c = "bg-[#dc2626] text-[#000000]";' },
       ],
       invalid: [
         // Off-sheet hex literals
@@ -95,6 +100,24 @@ describe("palette/no-off-palette-colors", () => {
         {
           code: "const c = `bg-violet-600`;",
           errors: [{ messageId: "offPaletteClass" }],
+        },
+        // Arbitrary color utilities — the namespace reset cannot reach these,
+        // because Tailwind builds them from the bracket, not from a token.
+        {
+          code: 'const c = "border-[red]";',
+          errors: [{ messageId: "offPaletteArbitrary" }],
+        },
+        {
+          code: 'const c = "fill-[color:var(--x)]";',
+          errors: [{ messageId: "offPaletteArbitrary" }],
+        },
+        {
+          code: 'const c = "hover:bg-[rebeccapurple]";',
+          errors: [{ messageId: "offPaletteArbitrary" }],
+        },
+        {
+          code: 'const el = <div className="bg-[#123456]" />;',
+          errors: [{ messageId: "offPaletteHex" }],
         },
       ],
     });
