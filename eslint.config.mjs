@@ -33,5 +33,14 @@ export default defineConfig([
     "node_modules/**",
     "next-env.d.ts",
     "**/*.css",
+    // The autonomous builder copies the whole repo — build output and all —
+    // into a scratch directory per issue. Git ignores it; without this, a
+    // local lint walks those copies and reports thousands of phantom problems
+    // in generated chunks. CI never sees them because it checks out fresh.
+    ".stella/**",
+    // Same reasoning for git worktrees cut inside the repo: they are copies of
+    // this tree, and their fixtures (deliberately off-palette colors, for one)
+    // are not this checkout's code to judge.
+    ".worktrees/**",
   ]),
 ]);
