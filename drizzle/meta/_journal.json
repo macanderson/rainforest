@@ -22,6 +22,13 @@
       "when": 1788222879120,
       "tag": "0002_job_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788225191765,
+      "tag": "0003_job_run_ledger",
+      "breakpoints": true
     }
   ]
 }

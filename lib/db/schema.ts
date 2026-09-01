@@ -109,6 +109,9 @@ export const JOB_RUN_STATUSES = [
   "failure",
 ] as const;
 
+/** The observability outcomes a job run can end in. */
+export const JOB_RUN_OUTCOMES = ["success", "failure", "no-op"] as const;
+
 /**
  * Ledger of applied migrations. The runner (lib/db/migrate.mjs) records each
  * applied migration here so re-runs are no-ops and the applied set is
@@ -486,10 +489,36 @@ export const jobRuns = sqliteTable(
     detailJson: text("detail_json"),
     ...sharedColumns,
   },
-  (t) => [
+    (t) => [
     dataOriginCheck,
     index("job_runs_job_idx").on(t.job),
     index("job_runs_started_idx").on(t.startedAt),
+  ],
+);
+
+/**
+ * Idempotency ledger for the daily clock-shift job (architecture §8). One row
+ * per (job, ledger_date): the unique index makes a double run for the same
+ * calendar day an insert-conflict the job turns into a recorded no-op.
+ * `rows_shifted`, `duration_ms`, and `outcome` feed the job observability
+ * page (E6#4). No FKs: the ledger must survive the demo wipe.
+ */
+export const jobRunLedger = sqliteTable(
+  "job_run_ledger",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    job: text("job", { enum: JOB_NAMES }).notNull(),
+    /** UTC calendar date the run is for, `YYYY-MM-DD`. */
+    ledgerDate: text("ledger_date").notNull(),
+    outcome: text("outcome", { enum: JOB_RUN_OUTCOMES }).notNull(),
+    rowsAffected: integer("rows_affected").notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    detailJson: text("detail_json"),
+    ...sharedColumns,
+  },
+  (t) => [
+    dataOriginCheck,
+    uniqueIndex("job_run_ledger_job_date_unique").on(t.job, t.ledgerDate),
   ],
 );
 

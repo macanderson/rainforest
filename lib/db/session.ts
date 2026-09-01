@@ -137,7 +137,12 @@ const RAW_INSERT_ALLOWLIST: Record<string, string> = {
     "system writer, not a user write path: it restores snapshot rows with their original data_origin, " +
     "writes the snapshot table, and logs job_runs with an explicit origin — the session stamp would " +
     "overwrite an origin these rows already carry",
+  "lib/db/clock-shift.ts":
+    "system writer, not a user write path: it shifts seed rows in place preserving their data_origin " +
+    "and writes the job_run_ledger with an explicit origin — the session stamp would overwrite origins " +
+    "these rows already carry",
   "tests/demo-wipe.test.mjs": "seeds wipe/restore fixtures across tables with raw SQL",
+  "tests/clock-shift.test.mjs": "seeds clock-shift fixtures across tables with raw SQL",
   "tests/reconcile.test.mjs": "seeds catalog fixtures with raw SQL to aggregate against the bible",
 };
 
