@@ -100,6 +100,15 @@ export const AGENT_NAMES = [
   "exception",
 ] as const;
 
+/** The living-demo jobs (architecture §7.2, §8). */
+export const JOB_NAMES = ["demo-wipe", "clock-shift"] as const;
+
+export const JOB_RUN_STATUSES = [
+  "running",
+  "success",
+  "failure",
+] as const;
+
 /**
  * Ledger of applied migrations. The runner (lib/db/migrate.mjs) records each
  * applied migration here so re-runs are no-ops and the applied set is
@@ -455,6 +464,32 @@ export const agentActions = sqliteTable(
     dataOriginCheck,
     index("agent_actions_agent_idx").on(t.agent),
     index("agent_actions_entity_idx").on(t.entityTable, t.entityId),
+  ],
+);
+
+/**
+ * Run ledger for the living-demo jobs (architecture §8, §9.2). Every job run —
+ * the 08:00 UTC demo wipe, the 04:00 UTC clock shift — records one row here:
+ * started/finished, outcome, and a JSON detail payload (rows wiped, rows
+ * restored, duration, error). The job observability page (E6#4) reads this
+ * table. No hard FKs: the ledger must survive every wipe.
+ */
+export const jobRuns = sqliteTable(
+  "job_runs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    job: text("job", { enum: JOB_NAMES }).notNull(),
+    status: text("status", { enum: JOB_RUN_STATUSES }).notNull(),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+    /** JSON payload: rows wiped/restored per table, duration, error message. */
+    detailJson: text("detail_json"),
+    ...sharedColumns,
+  },
+  (t) => [
+    dataOriginCheck,
+    index("job_runs_job_idx").on(t.job),
+    index("job_runs_started_idx").on(t.startedAt),
   ],
 );
 
