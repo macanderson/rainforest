@@ -103,6 +103,30 @@ export const AGENT_NAMES = [
 /** The living-demo jobs (architecture §7.2, §8). */
 export const JOB_NAMES = ["demo-wipe", "clock-shift"] as const;
 
+/** The three roles of architecture.md §5. */
+export const USER_ROLES = ["admin", "sales-rep", "agent"] as const;
+
+/**
+ * Credential accounts (architecture.md §5 — iron-session credential auth).
+ * `admin` and `sales-rep` log in interactively; the `agent` row exists so the
+ * role set is complete in the data model, but agents authenticate via bearer
+ * secret on the cron endpoints and never hold an interactive session.
+ * Passwords are stored as scrypt hashes (`scrypt:N:r:p:salt:hash`, hex) —
+ * never plaintext.
+ */
+export const users = sqliteTable(
+  "users",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    email: text("email").notNull().unique(),
+    displayName: text("display_name").notNull(),
+    role: text("role", { enum: USER_ROLES }).notNull(),
+    passwordHash: text("password_hash").notNull(),
+    ...sharedColumns,
+  },
+  (t) => [dataOriginCheck, index("users_role_idx").on(t.role)],
+);
+
 export const JOB_RUN_STATUSES = [
   "running",
   "success",
