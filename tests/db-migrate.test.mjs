@@ -21,6 +21,7 @@ describe("db/migrate — migration runner", () => {
       "0002_job_runs",
       "0003_job_run_ledger",
       "0004_users",
+      "0005_audit_log",
     ]);
 
     const sqlite = new Database(dbPath);
@@ -42,6 +43,7 @@ describe("db/migrate — migration runner", () => {
       { tag: "0002_job_runs", data_origin: "seed" },
       { tag: "0003_job_run_ledger", data_origin: "seed" },
       { tag: "0004_users", data_origin: "seed" },
+      { tag: "0005_audit_log", data_origin: "seed" },
     ]);
     sqlite.close();
   });

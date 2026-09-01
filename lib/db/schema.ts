@@ -549,6 +549,17 @@ export const jobRunLedger = sqliteTable(
 /**
  * Append-only trail of every mutation (architecture §9.3). No hard FKs and no
  * cascade: the trail must survive the demo wipe and the clock shift intact.
+ *
+ * Written exclusively by the mutation helpers in lib/db/audit.ts, in the same
+ * transaction as the mutation they record, so a mutation through the helper
+ * can never skip its audit row. Row shape per §9.3: `actor` (`human:<user>`
+ * or `agent:<name>`), `action` (machine-readable verb), `before`/`after` row
+ * snapshots (JSON; before is NULL on create, after is NULL on delete), and a
+ * `reason` string (machine-readable for agents, free text for humans).
+ * Append-only is enforced three ways: no update/delete path exists in the
+ * codebase, the raw-write scanner (lib/db/session.ts) fails CI on one, and
+ * migration 0005 installs triggers that reject UPDATE/DELETE on this table at
+ * the database layer.
  */
 export const auditLog = sqliteTable(
   "audit_log",
