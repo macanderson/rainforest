@@ -15,6 +15,13 @@
       "when": 1788217822963,
       "tag": "0001_core_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788222879120,
+      "tag": "0002_job_runs",
+      "breakpoints": true
     }
   ]
 }
