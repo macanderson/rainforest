@@ -152,6 +152,16 @@ const RAW_INSERT_ALLOWLIST: Record<string, string> = {
     "accounts with an explicit 'seed' origin — accounts are seed data, not session-attributed rows",
   "tests/auth.test.mjs":
     "exercises the users-table CHECK constraint with a raw SQL fixture",
+  "lib/seed/orchestrator.ts":
+    "system writer, not a user write path: the master seed orchestrator wipes and reseeds " +
+    "data_origin='seed' rows with an explicit origin — there is no interactive session during " +
+    "a seed, and the session stamp would overwrite the origin these rows must carry",
+  "lib/seed/generators.ts":
+    "the built-in domain generators write exclusively through the orchestrator's SeedHandle " +
+    "(lib/seed/orchestrator.ts), which stamps data_origin='seed' — the handle.insert call " +
+    "sites are not write paths of their own",
+  "tests/seed-orchestrator.test.mjs":
+    "exercises the orchestrator with raw SQL fixtures and content digests",
 };
 
 const RAW_INSERT_PATTERNS = [
