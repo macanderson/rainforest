@@ -94,12 +94,12 @@ describe("pnpm seed orchestrator CLI", () => {
       encoding: "utf8",
     });
 
-  it("runs migrations and reports the harness is ready", () => {
+  it("runs migrations and walks the full 23-quarter history", () => {
     const dbPath = join(dir, "cli.db");
     const out = run({ DATABASE_PATH: dbPath });
     assert.match(out, /root seed 20260901 \(default/);
     assert.match(out, /schema ready/);
-    assert.match(out, /no domain generators registered yet/);
+    assert.match(out, /walked 23 quarters \(2021-Q1 → 2026-Q3\)/);
   });
 
   it("is idempotent: a second run applies no migrations", () => {
