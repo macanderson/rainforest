@@ -146,6 +146,11 @@ const RAW_INSERT_ALLOWLIST: Record<string, string> = {
   "tests/reconcile.test.mjs": "seeds catalog fixtures with raw SQL to aggregate against the bible",
   "tests/jobs-observability.test.mjs":
     "seeds job_run_ledger/job_runs fixtures with raw SQL to test the observability reads",
+  "lib/auth/seed-users.mjs":
+    "credential-account seeder, not a user write path: idempotently inserts the §5 demo " +
+    "accounts with an explicit 'seed' origin — accounts are seed data, not session-attributed rows",
+  "tests/auth.test.mjs":
+    "exercises the users-table CHECK constraint with a raw SQL fixture",
 };
 
 const RAW_INSERT_PATTERNS = [
