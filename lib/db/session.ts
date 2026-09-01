@@ -134,6 +134,13 @@ const RAW_INSERT_ALLOWLIST: Record<string, string> = {
     "the audit-trail mutation chokepoint itself (architecture §9.3): createRow/updateRow/deleteRow " +
     "are the single write path for domain mutations and write the audit_log row in the same " +
     "transaction — the .insert/.update/.delete call sites here ARE the sanctioned write path",
+  "lib/db/agent.ts":
+    "the agent action framework chokepoint (architecture §9.2): runAgentAction writes the " +
+    "agent_actions ledger row in the same transaction as the mutation it governs, with an " +
+    "explicit 'agent' origin inside the agent-role session it opens — the .insert call sites " +
+    "here ARE the sanctioned agent write path",
+  "tests/agent-framework.test.mjs":
+    "seeds category/supplier backbone fixtures with raw SQL to exercise the framework",
   "lib/db/migrate.mjs": "migration runner; ledger rows are stamped 'seed' explicitly",
   "tests/db-migrate.test.mjs": "exercises the runner and the CHECK constraint directly",
   "tests/db-schema.test.mjs": "exercises DDL/cascade behavior with raw SQL fixtures",
