@@ -25,7 +25,7 @@
  */
 import type Database from "better-sqlite3";
 
-import { reconcile, type ReconcileReport } from "../reconcile.ts";
+import { reconcile, type BibleRow, type ReconcileReport } from "../reconcile.ts";
 
 /**
  * Wipe order: children before parents so no delete ever dangles a FK, even
@@ -185,7 +185,11 @@ interface WipeBody {
 }
 
 /** The wipe itself. Throws if the reconcile postcondition is red. */
-function wipeBody(sqlite: Sqlite, startedAt: number): WipeBody {
+function wipeBody(
+  sqlite: Sqlite,
+  startedAt: number,
+  opts: { bible?: BibleRow[]; skipIdentities?: boolean } = {},
+): WipeBody {
   // Phase 1 — restore seed rows mutated since the last snapshot.
   const rowsRestored = restoreFromSnapshot(sqlite, startedAt);
 
@@ -202,7 +206,9 @@ function wipeBody(sqlite: Sqlite, startedAt: number): WipeBody {
   // the database is bible-true. A red reconcile throws and the surrounding
   // transaction rolls the whole wipe back.
   writeSnapshot(sqlite, readSeedRows(sqlite));
-  const report = reconcile(sqlite);
+  const report = reconcile(sqlite, opts.bible, {
+    skipIdentities: opts.skipIdentities,
+  });
   if (!report.ok) {
     const message = report.findings
       .map(
@@ -220,7 +226,10 @@ function wipeBody(sqlite: Sqlite, startedAt: number): WipeBody {
  * transaction; the job_runs ledger row is written after, so both success and
  * failure are observable.
  */
-export function runDemoWipe(sqlite: Sqlite): DemoWipeResult {
+export function runDemoWipe(
+  sqlite: Sqlite,
+  opts: { bible?: BibleRow[]; skipIdentities?: boolean } = {},
+): DemoWipeResult {
   const startedAt = Date.now();
   ensureSnapshotTable(sqlite);
 
@@ -228,7 +237,7 @@ export function runDemoWipe(sqlite: Sqlite): DemoWipeResult {
   let error: string | undefined;
   try {
     sqlite.transaction(() => {
-      body = wipeBody(sqlite, startedAt);
+      body = wipeBody(sqlite, startedAt, opts);
     })();
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);

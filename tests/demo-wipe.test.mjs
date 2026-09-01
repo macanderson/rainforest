@@ -7,6 +7,7 @@ import { after, before, describe, it } from "node:test";
 
 import { runMigrations } from "../lib/db/migrate.mjs";
 import { runDemoWipe, WIPE_ORDER } from "../lib/db/demo-wipe.ts";
+import { loadBible } from "../lib/reconcile.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "rf-demo-wipe-"));
 const dbPath = join(dir, "test.db");
@@ -20,6 +21,31 @@ after(() => {
 });
 
 const NOW = 1_800_000_000_000;
+
+// The demo-wipe job runs reconcile() as a postcondition, and the armed DB
+// half diffs seed rows against the bible within ±2% (reconciliation.md §2).
+// The seed fixture below must therefore be bible-true: it carries a synthetic
+// bible whose 2025-Q3 row matches the fixture exactly (1 order, $50 GMV, 1
+// on-time shipment, 1 ticket — revenue = 0.64×50 + 0.15×0.36×50 = $34.70).
+const FIXTURE_BIBLE = loadBible().map((r) =>
+  r.quarter === "2025-Q3"
+    ? {
+        ...r,
+        gmv_usd_m: 0.00005,
+        revenue_usd_m: 0.0000347,
+        orders_k: 0.001,
+        aov_usd: 50,
+        first_party_share_pct: 64.0,
+        marketplace_take_rate_pct: 15.0,
+        on_time_delivery_pct: 100,
+        tickets_per_1k_orders: 1000,
+      }
+    : r,
+);
+// The synthetic row breaks bible-internal identities (I1/I2 tolerance is ±1%)
+// and the story beats, so the postcondition diff must skip them — this is a
+// fixture bible, not editorial truth.
+const wipeOpts = { bible: FIXTURE_BIBLE, skipIdentities: true };
 
 const count = (table, origin) =>
   sqlite
@@ -272,7 +298,7 @@ describe("demo-wipe job (E6#3, architecture §8)", () => {
       WIPE_ORDER.map((t) => [t, count(t, "seed")]),
     );
 
-    const result = runDemoWipe(sqlite);
+    const result = runDemoWipe(sqlite, wipeOpts);
 
     assert.equal(result.ok, true, result.error);
     assert.equal(result.reconcile.ok, true);
@@ -314,7 +340,7 @@ describe("demo-wipe job (E6#3, architecture §8)", () => {
     });
     plantDemoGraph(seed, 2);
 
-    const result = runDemoWipe(sqlite);
+    const result = runDemoWipe(sqlite, wipeOpts);
 
     assert.equal(result.ok, true, result.error);
     assert.equal(count("agent_actions", "agent"), 1);
@@ -335,7 +361,7 @@ describe("demo-wipe job (E6#3, architecture §8)", () => {
     sqlite.prepare("DELETE FROM shipments WHERE id = ?").run(seed.shipmentId);
     assert.equal(count("shipments", "seed"), 0);
 
-    const result = runDemoWipe(sqlite);
+    const result = runDemoWipe(sqlite, wipeOpts);
 
     assert.equal(result.ok, true, result.error);
     assert.equal(
@@ -365,7 +391,7 @@ describe("demo-wipe job (E6#3, architecture §8)", () => {
     const before_ = Object.fromEntries(
       WIPE_ORDER.map((t) => [t, count(t, "seed")]),
     );
-    const result = runDemoWipe(sqlite);
+    const result = runDemoWipe(sqlite, wipeOpts);
 
     assert.equal(result.ok, true, result.error);
     assert.deepEqual(result.rowsWiped, {});

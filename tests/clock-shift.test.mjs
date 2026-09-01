@@ -7,6 +7,7 @@ import { after, before, describe, it } from "node:test";
 
 import { DAY_MS, ledgerDate, runClockShift } from "../lib/db/clock-shift.ts";
 import { runMigrations } from "../lib/db/migrate.mjs";
+import { loadBible } from "../lib/reconcile.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "rf-clock-shift-"));
 const dbPath = join(dir, "test.db");
@@ -20,6 +21,31 @@ after(() => {
 });
 
 const NOW = 1_800_000_000_000;
+
+// The clock-shift job runs reconcile() as a postcondition, and the armed DB
+// half diffs seed rows against the bible within ±2% (reconciliation.md §2).
+// The seed fixture below must therefore be bible-true: it carries a synthetic
+// bible whose 2025-Q3 row matches the fixture exactly (1 order, $50 GMV, 1
+// on-time shipment, 1 ticket — revenue = 0.64×50 + 0.15×0.36×50 = $34.70).
+const FIXTURE_BIBLE = loadBible().map((r) =>
+  r.quarter === "2025-Q3"
+    ? {
+        ...r,
+        gmv_usd_m: 0.00005,
+        revenue_usd_m: 0.0000347,
+        orders_k: 0.001,
+        aov_usd: 50,
+        first_party_share_pct: 64.0,
+        marketplace_take_rate_pct: 15.0,
+        on_time_delivery_pct: 100,
+        tickets_per_1k_orders: 1000,
+      }
+    : r,
+);
+// The synthetic row breaks bible-internal identities (I1/I2 tolerance is ±1%)
+// and the story beats, so the postcondition diff must skip them — this is a
+// fixture bible, not editorial truth.
+const shiftOpts = { bible: FIXTURE_BIBLE, skipIdentities: true };
 
 const insert = (table, row) => {
   const cols = Object.keys(row);
@@ -104,6 +130,7 @@ before(() => {
     quarter_tag: "2025-Q3",
     promised_at: NOW,
     delivered_at: NOW,
+    is_late: 0,
     data_origin: "seed",
   });
   insert("support_tickets", {
@@ -159,7 +186,7 @@ before(() => {
 describe("clock-shift — the 04:00 UTC living-demo job (architecture §8)", () => {
   it("happy path: shifts every seed timestamp forward exactly +1 day", () => {
     const before = getOrder("SO-SEED-SHIFT");
-    const result = runClockShift(sqlite, NOW);
+    const result = runClockShift(sqlite, NOW, shiftOpts);
 
     assert.equal(result.ok, true);
     assert.equal(result.outcome, "success");
@@ -224,7 +251,7 @@ describe("clock-shift — the 04:00 UTC living-demo job (architecture §8)", () 
 
   it("double run for the same day is refused — recorded no-op, nothing shifted twice", () => {
     const beforeSecond = getOrder("SO-SEED-SHIFT");
-    const result = runClockShift(sqlite, NOW + 3_600_000); // same UTC date, an hour later
+    const result = runClockShift(sqlite, NOW + 3_600_000, shiftOpts); // same UTC date, an hour later
 
     assert.equal(result.ok, true);
     assert.equal(result.outcome, "no-op");
@@ -243,7 +270,7 @@ describe("clock-shift — the 04:00 UTC living-demo job (architecture §8)", () 
   it("a run the next UTC day shifts again (ledger is per-date, not once-ever)", () => {
     const nextDay = NOW + DAY_MS + 3_600_000;
     const beforeNext = getOrder("SO-SEED-SHIFT");
-    const result = runClockShift(sqlite, nextDay);
+    const result = runClockShift(sqlite, nextDay, shiftOpts);
 
     assert.equal(result.ok, true);
     assert.equal(result.outcome, "success");
@@ -265,7 +292,7 @@ describe("clock-shift — the 04:00 UTC living-demo job (architecture §8)", () 
     sqlite.exec("ALTER TABLE support_tickets RENAME COLUMN opened_at TO opened_at_broken");
     try {
       const beforeFail = getOrder("SO-SEED-SHIFT");
-      const result = runClockShift(sqlite, NOW + 2 * DAY_MS + 3_600_000);
+      const result = runClockShift(sqlite, NOW + 2 * DAY_MS + 3_600_000, shiftOpts);
 
       assert.equal(result.ok, false);
       assert.equal(result.outcome, "failure");

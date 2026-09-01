@@ -7,10 +7,12 @@
  *    seed data exists: I1 (orders × AOV ≈ GMV) and I2 (revenue ≈ 1P gross +
  *    3P take) on every one of the 23 bible rows, plus the structural
  *    story-beat guards.
- * 2. **Seeded-DB-vs-bible** (§2) — armed once the E3 generators land. Until
- *    then the engine verifies the seed tables are empty of `data_origin='seed'`
- *    rows and reports the half as skipped. Rows with `data_origin` of 'demo'
- *    or 'agent' are always excluded from the diff.
+ * 2. **Seeded-DB-vs-bible** (§2) — aggregates the seeded database per quarter
+ *    tag (never wall-clock date, so the E6#2 clock-shift job can never break
+ *    it) and diffs D1–D6 against the bible within ±2% relative. Rows with
+ *    `data_origin` of 'demo' or 'agent' are always excluded from the diff.
+ *    The half is armed as soon as any `data_origin='seed'` sales order or
+ *    support ticket exists; before that it reports "skipped".
  *
  * The nightly demo-wipe job (E6#3) runs `reconcile()` as a postcondition so
  * the next demo starts from a bible-true database.
@@ -42,11 +44,25 @@ export interface ReconcileFinding {
   message: string;
 }
 
+/** One cell of the drift report: a metric in a quarter, bible vs DB. */
+export interface DriftCell {
+  check: string;
+  metric: string;
+  quarter: string;
+  bible: number;
+  db: number;
+  /** Relative drift, (db − bible) / bible; 0 when both are zero. */
+  driftPct: number;
+  pass: boolean;
+}
+
 export interface ReconcileReport {
   ok: boolean;
   /** "armed" once seed data exists; "skipped" while the DB is unseeded. */
   dbHalf: "armed" | "skipped";
   findings: ReconcileFinding[];
+  /** Per quarter × metric drift cells (empty while the DB half is skipped). */
+  cells: DriftCell[];
 }
 
 /** Load and minimally validate the numbers bible. */
@@ -64,6 +80,27 @@ export function loadBible(
 function within(actual: number, expected: number, tolerancePct: number) {
   if (expected === 0) return actual === 0;
   return Math.abs(actual - expected) / Math.abs(expected) <= tolerancePct / 100;
+}
+
+/** Relative drift in percent, (actual − expected) / expected × 100. */
+function driftPct(actual: number, expected: number): number {
+  if (expected === 0) return actual === 0 ? 0 : 100;
+  return ((actual - expected) / Math.abs(expected)) * 100;
+}
+
+/**
+ * The E2#4 revenue derivation shape: 1P gross + 3P take. This is the single
+ * source of the formula — the bible-internal identity I2 and the DB-side
+ * metric D1 both consume it, so the two halves can never disagree about what
+ * "revenue" means. All money inputs are in the same unit (e.g. USD millions).
+ */
+export function deriveRevenue(
+  gmv: number,
+  firstPartySharePct: number,
+  takeRatePct: number,
+): number {
+  const share = firstPartySharePct / 100;
+  return gmv * share + (takeRatePct / 100) * gmv * (1 - share);
 }
 
 /** §1 — bible-internal identities I1/I2 plus the story-beat guards. */
@@ -99,11 +136,13 @@ export function checkBibleIdentities(bible: BibleRow[]): ReconcileFinding[] {
       });
     }
 
-    // I2: revenue ≈ gmv×1P% + take_rate×gmv×(1−1P%) (±1%).
-    const share = row.first_party_share_pct / 100;
-    const impliedRevenue =
-      row.gmv_usd_m * share +
-      (row.marketplace_take_rate_pct / 100) * row.gmv_usd_m * (1 - share);
+    // I2: revenue ≈ gmv×1P% + take_rate×gmv×(1−1P%) (±1%) — the E2#4
+    // derivation shape, shared with the DB-side D1 metric.
+    const impliedRevenue = deriveRevenue(
+      row.gmv_usd_m,
+      row.first_party_share_pct,
+      row.marketplace_take_rate_pct,
+    );
     if (!within(impliedRevenue, row.revenue_usd_m, 1)) {
       findings.push({
         check: "I2",
@@ -175,45 +214,172 @@ export function checkBibleIdentities(bible: BibleRow[]): ReconcileFinding[] {
   return findings;
 }
 
+/** The §2 metric table: D1–D6, all ±2% relative. */
+const DB_TOLERANCE_PCT = 2;
+
+interface QuarterAggregate {
+  quarter: string;
+  orders: number;
+  gmvCents: number;
+  shipments: number;
+  lateShipments: number;
+  tickets: number;
+}
+
 /**
- * §2 — seeded-DB-vs-bible. Armed once the E3 generators land; until then the
- * seed tables are empty and this half verifies that and reports "skipped".
- * Accepts a better-sqlite3 handle. Demo/agent rows are never counted.
+ * §2 — seeded-DB-vs-bible. Aggregates the seeded database per quarter tag
+ * (DEMO_EPOCH-relative, never wall-clock date — the E6#2 clock-shift job
+ * moves timestamps but never tags, so it can never break reconciliation) and
+ * diffs D1–D6 against the bible within ±2% relative. Only `data_origin='seed'`
+ * rows are counted; 'demo' and 'agent' rows are excluded from the diff.
+ * Accepts a better-sqlite3 handle.
  */
 export function checkDbAgainstBible(
   sqlite: Pick<Database.Database, "prepare">,
   bible: BibleRow[],
-): { half: "armed" | "skipped"; findings: ReconcileFinding[] } {
-  void bible; // the D1–D6 diffs consume it once the E3 generators land
-  const row = sqlite
+): { half: "armed" | "skipped"; findings: ReconcileFinding[]; cells: DriftCell[] } {
+  // Aggregate per quarter tag in three passes (orders, shipments, tickets),
+  // each filtered to data_origin='seed' at the row that carries the tag.
+  const orders = sqlite
     .prepare(
-      "SELECT (SELECT COUNT(*) FROM sales_orders WHERE data_origin = 'seed') AS orders, " +
-        "(SELECT COUNT(*) FROM products WHERE data_origin = 'seed') AS products",
+      "SELECT quarter_tag AS quarter, COUNT(*) AS orders, SUM(total_cents) AS gmvCents " +
+        "FROM sales_orders WHERE data_origin = 'seed' GROUP BY quarter_tag",
     )
-    .get() as { orders: number; products: number };
+    .all() as { quarter: string; orders: number; gmvCents: number }[];
+  const shipments = sqlite
+    .prepare(
+      "SELECT quarter_tag AS quarter, COUNT(*) AS shipments, SUM(is_late) AS lateShipments " +
+        "FROM shipments WHERE data_origin = 'seed' GROUP BY quarter_tag",
+    )
+    .all() as { quarter: string; shipments: number; lateShipments: number }[];
+  const tickets = sqlite
+    .prepare(
+      "SELECT quarter_tag AS quarter, COUNT(*) AS tickets " +
+        "FROM support_tickets WHERE data_origin = 'seed' GROUP BY quarter_tag",
+    )
+    .all() as { quarter: string; tickets: number }[];
 
-  if (row.orders === 0 && row.products === 0) {
-    return { half: "skipped", findings: [] };
+  const byQuarter = new Map<string, QuarterAggregate>();
+  const bucket = (tag: string): QuarterAggregate => {
+    let agg = byQuarter.get(tag);
+    if (!agg) {
+      agg = {
+        quarter: tag,
+        orders: 0,
+        gmvCents: 0,
+        shipments: 0,
+        lateShipments: 0,
+        tickets: 0,
+      };
+      byQuarter.set(tag, agg);
+    }
+    return agg;
+  };
+  for (const r of orders) {
+    const agg = bucket(r.quarter);
+    agg.orders = r.orders;
+    agg.gmvCents = r.gmvCents ?? 0;
+  }
+  for (const r of shipments) {
+    const agg = bucket(r.quarter);
+    agg.shipments = r.shipments;
+    agg.lateShipments = r.lateShipments ?? 0;
+  }
+  for (const r of tickets) {
+    bucket(r.quarter).tickets = r.tickets;
   }
 
-  // The D1–D6 aggregation diffs arm with the E3 generators. Seed data exists
-  // but there is nothing to diff it against yet, so this half stays skipped
-  // rather than failing closed — the bible-internal identities above remain
-  // CI-blocking from day one.
-  return { half: "skipped", findings: [] };
+  if (byQuarter.size === 0) {
+    // No seed rows yet — the half stays skipped so the engine is useful
+    // (bible-internal identities only) before any seed data exists.
+    return { half: "skipped", findings: [], cells: [] };
+  }
+
+  const findings: ReconcileFinding[] = [];
+  const cells: DriftCell[] = [];
+  const bibleByQuarter = new Map(bible.map((r) => [r.quarter, r]));
+
+  const diff = (
+    check: string,
+    metric: string,
+    quarter: string,
+    dbValue: number,
+    bibleValue: number,
+  ) => {
+    const pass = within(dbValue, bibleValue, DB_TOLERANCE_PCT);
+    cells.push({
+      check,
+      metric,
+      quarter,
+      bible: bibleValue,
+      db: dbValue,
+      driftPct: driftPct(dbValue, bibleValue),
+      pass,
+    });
+    if (!pass) {
+      findings.push({
+        check,
+        quarter,
+        message:
+          `${metric}: DB ${dbValue.toFixed(4)} vs bible ${bibleValue} ` +
+          `(drift ${driftPct(dbValue, bibleValue).toFixed(2)}%, tolerance ±${DB_TOLERANCE_PCT}%)`,
+      });
+    }
+  };
+
+  for (const tag of [...byQuarter.keys()].sort()) {
+    const agg = byQuarter.get(tag)!;
+    const row = bibleByQuarter.get(tag);
+    if (!row) {
+      findings.push({
+        check: "D0",
+        quarter: tag,
+        message: `seed rows carry quarter tag ${tag} which is not in the bible`,
+      });
+      continue;
+    }
+
+    const gmvM = agg.gmvCents / 100 / 1_000_000;
+    const ordersK = agg.orders / 1000;
+    const aov = agg.orders > 0 ? agg.gmvCents / 100 / agg.orders : 0;
+    // D1 uses the E2#4 derivation shape (1P gross + 3P take) — the same
+    // deriveRevenue the bible-internal identity I2 checks against.
+    const revenueM = deriveRevenue(
+      gmvM,
+      row.first_party_share_pct,
+      row.marketplace_take_rate_pct,
+    );
+    const onTimePct =
+      agg.shipments > 0
+        ? (100 * (agg.shipments - agg.lateShipments)) / agg.shipments
+        : 0;
+    const ticketsPer1k = agg.orders > 0 ? (1000 * agg.tickets) / agg.orders : 0;
+
+    diff("D1", "revenue_usd_m", tag, revenueM, row.revenue_usd_m);
+    diff("D2", "orders_k", tag, ordersK, row.orders_k);
+    diff("D3", "aov_usd", tag, aov, row.aov_usd);
+    diff("D4", "gmv_usd_m", tag, gmvM, row.gmv_usd_m);
+    diff("D5", "on_time_delivery_pct", tag, onTimePct, row.on_time_delivery_pct);
+    diff("D6", "tickets_per_1k_orders", tag, ticketsPer1k, row.tickets_per_1k_orders);
+  }
+
+  return { half: "armed", findings, cells };
 }
 
 /** Run both halves. `sqlite` is optional; omit it for the bible-only check. */
 export function reconcile(
   sqlite?: Parameters<typeof checkDbAgainstBible>[0],
   bible: BibleRow[] = loadBible(),
+  opts: { skipIdentities?: boolean } = {},
 ): ReconcileReport {
-  const findings = checkBibleIdentities(bible);
+  const findings = opts.skipIdentities ? [] : checkBibleIdentities(bible);
   let dbHalf: ReconcileReport["dbHalf"] = "skipped";
+  let cells: DriftCell[] = [];
   if (sqlite) {
     const db = checkDbAgainstBible(sqlite, bible);
     dbHalf = db.half;
+    cells = db.cells;
     findings.push(...db.findings);
   }
-  return { ok: findings.length === 0, dbHalf, findings };
+  return { ok: findings.length === 0, dbHalf, findings, cells };
 }

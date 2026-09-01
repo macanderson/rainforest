@@ -7,7 +7,8 @@ discipline drifts; CI doesn't.
 
 `pnpm reconcile` is **CI-blocking** and runs on every PR that touches `data/` or seed code
 (E1#3). It has two halves: **bible-internal identities** (checkable from day one, before any
-seed data exists) and **seeded-DB-vs-bible** aggregation diffs (armed once E3 generators land).
+seed data exists) and **seeded-DB-vs-bible** aggregation diffs (armed as soon as any
+`data_origin='seed'` order, shipment, or ticket exists — skipped while the DB is unseeded).
 
 ---
 
