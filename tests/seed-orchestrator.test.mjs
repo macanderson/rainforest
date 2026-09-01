@@ -262,7 +262,7 @@ describe("pnpm seed CLI (issue #20)", () => {
     // No duplicate suppliers after two runs.
     assert.equal(
       sqlite.prepare("SELECT COUNT(*) AS n FROM suppliers WHERE data_origin = 'seed'").get().n,
-      8,
+      22,
     );
     sqlite.close();
   });

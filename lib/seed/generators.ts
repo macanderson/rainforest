@@ -44,16 +44,39 @@ const DAY_MS = 86_400_000;
 /* Canon rosters (fictional; suppliers.md §1, inventory.md §1)         */
 /* ------------------------------------------------------------------ */
 
-/** The four locked-canon suppliers of suppliers.md §1, plus filler roster. */
+/**
+ * The full 22-supplier roster of suppliers.md §1 — every SKU's
+ * `supplier_id` must resolve into it (catalog.md §1). The four locked-canon
+ * suppliers (Brightline, Apex Plastics, Great Lakes, Saigon Circuit Works)
+ * carry their locked SLA figures; the rest carry the roster's lifetime
+ * on-time % and mean-days-late. `activeFrom`/`activeTo` are the supplier
+ * active windows the PO generator and the catalog's sourcing-shift rules
+ * respect (no Saigon before 2026-Q1, no Monterrey before 2026-Q2, no
+ * Brightline after 2025-Q4).
+ */
 const SUPPLIERS = [
   { code: "SUP-BRIGHTLINE", name: "Brightline Electronics Co.", location: "Shenzhen, CN", isImport: 1, onTimeBps: 7100, meanLateHundredths: 850, activeFrom: "2021-Q1", activeTo: "2025-Q4" },
-  { code: "SUP-APEX", name: "Apex Components Ltd.", location: "Penang, MY", isImport: 1, onTimeBps: 7600, meanLateHundredths: 620, activeFrom: "2021-Q1", activeTo: null },
-  { code: "SUP-GREATLAKES", name: "Great Lakes Packaging", location: "Cleveland, OH", isImport: 0, onTimeBps: 9800, meanLateHundredths: 90, activeFrom: "2021-Q1", activeTo: null },
-  { code: "SUP-SAIGON", name: "Saigon Precision Works", location: "Ho Chi Minh City, VN", isImport: 1, onTimeBps: 9500, meanLateHundredths: 210, activeFrom: "2026-Q1", activeTo: null },
-  { code: "SUP-MONTERREY", name: "Monterrey Plastics SA", location: "Monterrey, MX", isImport: 1, onTimeBps: 9300, meanLateHundredths: 260, activeFrom: "2026-Q2", activeTo: null },
-  { code: "SUP-HEARTLAND", name: "Heartland Home Goods", location: "Des Moines, IA", isImport: 0, onTimeBps: 9400, meanLateHundredths: 240, activeFrom: "2021-Q1", activeTo: null },
-  { code: "SUP-CASCADE", name: "Cascade Outdoor Supply", location: "Portland, OR", isImport: 0, onTimeBps: 9500, meanLateHundredths: 200, activeFrom: "2021-Q1", activeTo: null },
-  { code: "SUP-PRAIRIE", name: "Prairie Pantry Co.", location: "Kansas City, MO", isImport: 0, onTimeBps: 9600, meanLateHundredths: 170, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-APEX", name: "Apex Plastics Manufacturing", location: "Dongguan, CN", isImport: 1, onTimeBps: 7600, meanLateHundredths: 520, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-GREATLAKES", name: "Great Lakes Packaging", location: "Toledo, OH", isImport: 0, onTimeBps: 9800, meanLateHundredths: 120, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-SAIGON", name: "Saigon Circuit Works", location: "Ho Chi Minh City, VN", isImport: 1, onTimeBps: 9500, meanLateHundredths: 180, activeFrom: "2026-Q1", activeTo: null },
+  { code: "SUP-DRAGONGATE", name: "Dragon Gate Components", location: "Shenzhen, CN", isImport: 1, onTimeBps: 9100, meanLateHundredths: 360, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-STERLING", name: "Sterling Housewares Ltd.", location: "Guangzhou, CN", isImport: 1, onTimeBps: 8900, meanLateHundredths: 390, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-GOLDENHARBOR", name: "Golden Harbor Appliance Works", location: "Foshan, CN", isImport: 1, onTimeBps: 9100, meanLateHundredths: 340, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-PEARLRIVER", name: "Pearl River Toy Manufactory", location: "Shantou, CN", isImport: 1, onTimeBps: 9000, meanLateHundredths: 380, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-MONTERREY", name: "Monterrey Kitchen Metals S.A.", location: "Monterrey, MX", isImport: 1, onTimeBps: 9400, meanLateHundredths: 210, activeFrom: "2026-Q2", activeTo: null },
+  { code: "SUP-BUCKEYE", name: "Buckeye Foods Distribution", location: "Columbus, OH", isImport: 0, onTimeBps: 9600, meanLateHundredths: 140, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-RIVERBEND", name: "Riverbend Grocery Partners", location: "St. Louis, MO", isImport: 0, onTimeBps: 9500, meanLateHundredths: 160, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-MIAMIVALLEY", name: "Miami Valley Paper Co.", location: "Dayton, OH", isImport: 0, onTimeBps: 9700, meanLateHundredths: 110, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-BLUERIDGE", name: "Blue Ridge Cleaning Products", location: "Roanoke, VA", isImport: 0, onTimeBps: 9500, meanLateHundredths: 150, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-CHESAPEAKE", name: "Chesapeake Paper & Disposables", location: "Baltimore, MD", isImport: 0, onTimeBps: 9400, meanLateHundredths: 180, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-PRAIRIE", name: "Prairie Personal Care Labs", location: "Des Moines, IA", isImport: 0, onTimeBps: 9600, meanLateHundredths: 130, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-HEARTLAND", name: "Heartland Health Essentials", location: "Kansas City, MO", isImport: 0, onTimeBps: 9500, meanLateHundredths: 150, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-CARDINAL", name: "Cardinal Home Goods", location: "Indianapolis, IN", isImport: 0, onTimeBps: 9600, meanLateHundredths: 140, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-ALLEGHENY", name: "Allegheny Tabletop & Glass", location: "Pittsburgh, PA", isImport: 0, onTimeBps: 9400, meanLateHundredths: 190, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-WABASH", name: "Wabash Small Motors", location: "Fort Wayne, IN", isImport: 0, onTimeBps: 9500, meanLateHundredths: 160, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-LAKESHORE", name: "Lakeshore Pet Provisions", location: "Cleveland, OH", isImport: 0, onTimeBps: 9600, meanLateHundredths: 130, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-KEYSTONE", name: "Keystone Office Supply Co.", location: "Harrisburg, PA", isImport: 0, onTimeBps: 9700, meanLateHundredths: 120, activeFrom: "2021-Q1", activeTo: null },
+  { code: "SUP-NORTHWIND", name: "Northwind Toys & Games", location: "Grand Rapids, MI", isImport: 0, onTimeBps: 9500, meanLateHundredths: 170, activeFrom: "2021-Q1", activeTo: null },
 ] as const;
 
 /** The 11 fulfillment centers of inventory.md §1 (Warehouse Zero first). */
@@ -71,17 +94,22 @@ const WAREHOUSES = [
   { code: "FC-10", name: "FC Cleveland", city: "Cleveland", state: "OH", opened: "2025-Q3", sqftK: 170, role: "regional" },
 ] as const;
 
-/** The 9 categories of catalog.md §1 (tariff-exposed flagged). */
+/**
+ * The 9 categories of catalog.md §1, with per-category SKU counts, Rainforest
+ * Basics counts, log-uniform price bands (USD), and the primary-supplier
+ * pools. Exactly two are tariff-exposed: Consumer Electronics and Small
+ * Kitchen Appliances (catalog.md §3). Totals: 1,200 SKUs, 185 Basics.
+ */
 const CATEGORIES = [
-  { name: "Consumer Electronics", tariffExposed: 1 },
-  { name: "Home & Kitchen", tariffExposed: 1 },
-  { name: "Outdoor & Garden", tariffExposed: 0 },
-  { name: "Toys & Games", tariffExposed: 1 },
-  { name: "Beauty & Personal Care", tariffExposed: 0 },
-  { name: "Grocery & Pantry", tariffExposed: 0 },
-  { name: "Pet Supplies", tariffExposed: 0 },
-  { name: "Office & School", tariffExposed: 0 },
-  { name: "Automotive", tariffExposed: 0 },
+  { name: "Consumer Electronics", tariffExposed: 1, skus: 150, basics: 25, priceMin: 12, priceMax: 280, suppliers: ["SUP-BRIGHTLINE", "SUP-DRAGONGATE", "SUP-SAIGON"] },
+  { name: "Small Kitchen Appliances", tariffExposed: 1, skus: 110, basics: 20, priceMin: 18, priceMax: 190, suppliers: ["SUP-STERLING", "SUP-GOLDENHARBOR", "SUP-WABASH", "SUP-MONTERREY"] },
+  { name: "Home & Kitchen", tariffExposed: 0, skus: 190, basics: 40, priceMin: 6, priceMax: 120, suppliers: ["SUP-CARDINAL", "SUP-ALLEGHENY", "SUP-APEX"] },
+  { name: "Grocery & Pantry", tariffExposed: 0, skus: 210, basics: 30, priceMin: 3, priceMax: 45, suppliers: ["SUP-BUCKEYE", "SUP-RIVERBEND"] },
+  { name: "Health & Personal Care", tariffExposed: 0, skus: 140, basics: 25, priceMin: 4, priceMax: 60, suppliers: ["SUP-PRAIRIE", "SUP-HEARTLAND"] },
+  { name: "Cleaning & Household", tariffExposed: 0, skus: 120, basics: 20, priceMin: 3, priceMax: 40, suppliers: ["SUP-MIAMIVALLEY", "SUP-BLUERIDGE", "SUP-CHESAPEAKE"] },
+  { name: "Pet Supplies", tariffExposed: 0, skus: 100, basics: 10, priceMin: 5, priceMax: 75, suppliers: ["SUP-LAKESHORE"] },
+  { name: "Office & School", tariffExposed: 0, skus: 90, basics: 10, priceMin: 2, priceMax: 55, suppliers: ["SUP-KEYSTONE"] },
+  { name: "Toys & Games", tariffExposed: 0, skus: 90, basics: 5, priceMin: 8, priceMax: 90, suppliers: ["SUP-NORTHWIND", "SUP-PEARLRIVER", "SUP-APEX"] },
 ] as const;
 
 const CARRIERS = ["Midwest Parcel", "GreatLakes Freight", "Rainforest Logistics"] as const;
@@ -104,6 +132,12 @@ export interface BackboneState {
   productIds: number[];
   /** product id → supplier code, for PO/ticket attribution. */
   productSupplier: Map<number, string>;
+  /** product id → category name, for the tariff landed-cost trend. */
+  productCategory: Map<number, string>;
+  /** product id → base unit cost in cents (pre-index, catalog.md §3). */
+  productBaseCostCents: Map<number, number>;
+  /** product id → 1 when the SKU is a Rainforest Basics private label. */
+  productPrivateLabel: Map<number, number>;
   /** sales order id → quarter, for ticket attribution. */
   orderQuarter: Map<number, string>;
 }
@@ -115,6 +149,9 @@ export function emptyBackbone(): BackboneState {
     categoryIds: new Map(),
     productIds: [],
     productSupplier: new Map(),
+    productCategory: new Map(),
+    productBaseCostCents: new Map(),
+    productPrivateLabel: new Map(),
     orderQuarter: new Map(),
   };
 }
@@ -170,7 +207,18 @@ export function warehousesGenerator(state: BackboneState): DomainGenerator {
   };
 }
 
-/** E3#3 backbone: categories + the ~1,200-SKU catalog (seeded once). */
+/**
+ * E3#3 (issue #35): the 9 categories and the 1,200-SKU catalog of
+ * catalog.md §1, seeded once in the first quarter. Per-category SKU counts
+ * and Rainforest Basics counts come straight from the spec table (totals
+ * 1,200 and 185); list prices are log-uniform inside each category's price
+ * band; every SKU's supplier resolves into the 22-supplier roster and
+ * respects the sourcing-shift windows (no Saigon before 2026-Q1, no
+ * Monterrey before 2026-Q2, no Brightline after 2025-Q4 — catalog.md §3/§5).
+ * The tariff landed-cost trend itself is applied per quarter by the PO
+ * generator (see `landedCostCents`), which is what the reconcile hook
+ * measures.
+ */
 export function catalogGenerator(state: BackboneState): DomainGenerator {
   return {
     name: "catalog",
@@ -178,9 +226,6 @@ export function catalogGenerator(state: BackboneState): DomainGenerator {
     generateQuarter(handle, input) {
       if (input.quarter !== "2021-Q1") return;
       const rng = input.rng;
-      const domesticSuppliers = SUPPLIERS.map((s) => s.code).filter(
-        (s) => s !== "SUP-SAIGON" && s !== "SUP-MONTERREY",
-      );
       let skuCounter = 0;
       for (const c of CATEGORIES) {
         const categoryId = handle.insert("categories", {
@@ -188,26 +233,50 @@ export function catalogGenerator(state: BackboneState): DomainGenerator {
           tariff_exposed: c.tariffExposed,
         });
         state.categoryIds.set(c.name, categoryId);
-        // ~1,200 SKUs across 9 categories (catalog.md §1: 1,200 ± 25).
-        const skuCount = 133; // 9 × 133 = 1,197, inside the band
-        for (let i = 0; i < skuCount; i++) {
+        // The first `c.basics` SKUs of each category are the Rainforest
+        // Basics private-label line (catalog.md §1/§2).
+        for (let i = 0; i < c.skus; i++) {
           skuCounter += 1;
-          const supplierCode = c.tariffExposed
-            ? pick(rng, ["SUP-BRIGHTLINE", "SUP-APEX"] as const)
-            : pick(rng, domesticSuppliers);
-          const unitCost = int(rng, 300, 12_000);
+          const isBasics = i < c.basics;
+          const supplierCode = pick(rng, c.suppliers);
+          const supplierId = state.supplierIds.get(supplierCode);
+          if (supplierId === undefined) {
+            throw new Error(`catalog: supplier ${supplierCode} not seeded`);
+          }
+          // Log-uniform list price inside the category band (catalog.md §1).
+          const listPriceCents = Math.round(
+            Math.exp(
+              Math.log(c.priceMin) +
+                rng() * (Math.log(c.priceMax) - Math.log(c.priceMin)),
+            ) * 100,
+          );
+          // Per-SKU margin: national brands 30–50% of list; Basics price
+          // ~15–25% below the comparable national brand with initially
+          // higher margin (catalog.md §2), so their cost ratio is lower.
+          const costRatio = isBasics
+            ? 0.45 + rng() * 0.15 // 55–70% initial margin
+            : 0.5 + rng() * 0.2; // 30–50% margin
+          const baseCostCents = Math.max(
+            50,
+            Math.round(listPriceCents * costRatio),
+          );
           const id = handle.insert("products", {
             sku: `SKU-${String(skuCounter).padStart(5, "0")}`,
-            name: `${c.name} Item ${i + 1}`,
+            name: isBasics
+              ? `Rainforest Basics ${c.name} ${i + 1}`
+              : `${c.name} Item ${i + 1}`,
             category_id: categoryId,
-            supplier_id: state.supplierIds.get(supplierCode),
-            is_private_label: skuCounter % 7 === 0 ? 1 : 0, // ~171 Basics SKUs
-            unit_cost_cents: unitCost,
-            list_price_cents: Math.round(unitCost * (1.4 + rng() * 0.8)),
+            supplier_id: supplierId,
+            is_private_label: isBasics ? 1 : 0,
+            unit_cost_cents: baseCostCents,
+            list_price_cents: listPriceCents,
             first_sold_quarter: "2021-Q1",
           });
           state.productIds.push(id);
           state.productSupplier.set(id, supplierCode);
+          state.productCategory.set(id, c.name);
+          state.productBaseCostCents.set(id, baseCostCents);
+          state.productPrivateLabel.set(id, isBasics ? 1 : 0);
         }
       }
     },
@@ -245,6 +314,28 @@ export function inventoryGenerator(state: BackboneState): DomainGenerator {
   };
 }
 
+/**
+ * Landed unit cost for a SKU in a quarter (catalog.md §3): the SKU's base
+ * cost scaled by the quarter's `landed_cost_index_electronics` when the SKU
+ * sits in a tariff-exposed category (Consumer Electronics, Small Kitchen
+ * Appliances); flat at base cost otherwise. The index is 100.0 at 2024-Q1
+ * and 118.0 at 2025-Q4, so exposed-category PO unit costs climb +18% across
+ * the tariff window while unexposed categories stay flat — the reconcile
+ * hook (catalog.md §5.2) measures exactly this from PO unit costs.
+ */
+export function landedCostCents(
+  state: BackboneState,
+  productId: number,
+  bible: { landed_cost_index_electronics: number },
+): number {
+  const base = state.productBaseCostCents.get(productId);
+  if (base === undefined) throw new Error(`no base cost for product ${productId}`);
+  const category = state.productCategory.get(productId);
+  const exposed = CATEGORIES.find((c) => c.name === category)?.tariffExposed === 1;
+  if (!exposed) return base;
+  return Math.max(1, Math.round((base * bible.landed_cost_index_electronics) / 100));
+}
+
 /** E3#2 backbone: inbound POs, one per supplier active in the quarter. */
 export function purchaseOrdersGenerator(state: BackboneState): DomainGenerator {
   return {
@@ -270,7 +361,8 @@ export function purchaseOrdersGenerator(state: BackboneState): DomainGenerator {
         const receivedAt =
           promisedAt + (late ? int(rng, 1, 12) : -int(rng, 0, 2)) * DAY_MS;
         const warehouseId = state.warehouseIds.get(pick(rng, openWarehouses).code);
-        // 1–3 lines per PO from that supplier's SKUs.
+        // 1–3 lines per PO from that supplier's SKUs, priced at the
+        // quarter's landed cost (tariff index applied on exposed categories).
         const skus = state.productIds.filter(
           (id) => state.productSupplier.get(id) === s.code,
         );
@@ -279,10 +371,10 @@ export function purchaseOrdersGenerator(state: BackboneState): DomainGenerator {
         let totalLanded = 0;
         for (let i = 0; i < lineCount; i++) {
           const quantity = int(rng, 50, 500);
-          const unitCost = int(rng, 300, 12_000);
-          totalLanded += quantity * unitCost;
           const productId = skus[i % skus.length];
           if (productId === undefined) throw new Error("no SKU for supplier");
+          const unitCost = landedCostCents(state, productId, input.bible);
+          totalLanded += quantity * unitCost;
           lines.push({ productId, quantity, unitCost });
         }
         const poId = handle.insert("purchase_orders", {
