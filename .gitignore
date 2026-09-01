@@ -28,5 +28,8 @@ next-env.d.ts
 # reconciliation report (CI artifact, regenerated on every run)
 /reconcile-report.txt
 
+# palette-reset build fixture (tests/palette-reset.build.mjs, cleaned up after itself)
+/.palette-fixture-*
+
 # stella session state
 /.stella/

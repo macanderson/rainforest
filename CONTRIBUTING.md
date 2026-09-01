@@ -56,6 +56,9 @@ A PR is not done until **all** of `AGENTS.md` §2 holds:
 - [ ] Typecheck passes (`npm run typecheck`).
 - [ ] Lint passes with zero warnings (`npm run lint`).
 - [ ] Unit tests pass (`npm test`); new logic ships with new tests.
+- [ ] The palette build-output test passes (`npm run test:palette-build`) —
+      it builds a fixture page and asserts the default Tailwind palette is
+      stripped from the emitted CSS (`app/globals.css` reset).
 - [ ] **`pnpm reconcile` is green whenever data is touched** — any change
       under `data/`, any seed generator, any migration, any job that mutates
       seeded rows. (The reconcile script lands with the seed-data epic; until
