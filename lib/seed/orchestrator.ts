@@ -197,13 +197,24 @@ export function runSeed(
   const tables = dedupeTables(generators);
   const counts = new Map<string, number>();
 
+  // One prepared statement per table + column-set, not per row. A full seed
+  // inserts ~700k rows; preparing a statement for each held every one of them
+  // alive and cost 5.6GB of peak memory — more than the demo host has. The
+  // shapes repeat (a generator writes the same columns every time), so the
+  // cache stays small.
+  const statements = new Map<string, Database.Statement>();
   const handle: SeedHandle = {
     insert(table, row) {
       const columns = Object.keys(row);
-      const stmt = sqlite.prepare(
-        `INSERT INTO ${table} (${columns.join(", ")}, data_origin) ` +
-          `VALUES (${columns.map(() => "?").join(", ")}, 'seed')`,
-      );
+      const key = `${table}|${columns.join(",")}`;
+      let stmt = statements.get(key);
+      if (!stmt) {
+        stmt = sqlite.prepare(
+          `INSERT INTO ${table} (${columns.join(", ")}, data_origin) ` +
+            `VALUES (${columns.map(() => "?").join(", ")}, 'seed')`,
+        );
+        statements.set(key, stmt);
+      }
       const id = stmt.run(...columns.map((c) => row[c] as never))
         .lastInsertRowid as number;
       counts.set(table, (counts.get(table) ?? 0) + 1);
