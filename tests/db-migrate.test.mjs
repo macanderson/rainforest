@@ -15,7 +15,7 @@ after(() => rmSync(dir, { recursive: true, force: true }));
 describe("db/migrate — migration runner", () => {
   it("applies the migrations cleanly to a fresh database", () => {
     const applied = runMigrations(dbPath);
-    assert.deepEqual(applied, ["0000_init", "0001_core_schema"]);
+    assert.deepEqual(applied, ["0000_init", "0001_core_schema", "0002_job_runs"]);
 
     const sqlite = new Database(dbPath);
     const table = sqlite
@@ -33,6 +33,7 @@ describe("db/migrate — migration runner", () => {
     assert.deepEqual(rows, [
       { tag: "0000_init", data_origin: "seed" },
       { tag: "0001_core_schema", data_origin: "seed" },
+      { tag: "0002_job_runs", data_origin: "seed" },
     ]);
     sqlite.close();
   });

@@ -133,6 +133,12 @@ const RAW_INSERT_ALLOWLIST: Record<string, string> = {
   "tests/db-migrate.test.mjs": "exercises the runner and the CHECK constraint directly",
   "tests/db-schema.test.mjs": "exercises DDL/cascade behavior with raw SQL fixtures",
   "tests/db-session.test.mjs": "tests the chokepoint; its raw-insert mentions are scanner fixtures",
+  "lib/db/demo-wipe.ts":
+    "system writer, not a user write path: it restores snapshot rows with their original data_origin, " +
+    "writes the snapshot table, and logs job_runs with an explicit origin — the session stamp would " +
+    "overwrite an origin these rows already carry",
+  "tests/demo-wipe.test.mjs": "seeds wipe/restore fixtures across tables with raw SQL",
+  "tests/reconcile.test.mjs": "seeds catalog fixtures with raw SQL to aggregate against the bible",
 };
 
 const RAW_INSERT_PATTERNS = [
