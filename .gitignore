@@ -25,5 +25,8 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# reconciliation report (CI artifact, regenerated on every run)
+/reconcile-report.txt
+
 # stella session state
 /.stella/
