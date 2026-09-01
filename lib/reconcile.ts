@@ -20,6 +20,8 @@
 import type Database from "better-sqlite3";
 import { readFileSync } from "node:fs";
 
+import { deriveQuarterPnl } from "./pnl.ts";
+
 export interface BibleRow {
   quarter: string;
   gmv_usd_m: number;
@@ -151,8 +153,10 @@ export function checkBibleIdentities(bible: BibleRow[]): ReconcileFinding[] {
       });
     }
 
-    // I3 (partial): implied opex must be positive on every row. The ±2%
-    // match against the E2#4 opex model arms when that model lands.
+    // I3: the implied opex wedge must be positive on every row and match the
+    // E2#4 modeled opex schedule (lib/pnl.ts `deriveQuarterPnl`) within ±2%.
+    // Both sides compute the same formula, so this is a structural guard that
+    // the model and the gate can never drift apart.
     const impliedOpex =
       row.revenue_usd_m * (row.gross_margin_pct / 100) - row.net_income_usd_m;
     if (impliedOpex <= 0) {
@@ -160,6 +164,14 @@ export function checkBibleIdentities(bible: BibleRow[]): ReconcileFinding[] {
         check: "I3",
         quarter: row.quarter,
         message: `implied opex ${impliedOpex.toFixed(1)}M is not positive`,
+      });
+    }
+    const modeledOpex = deriveQuarterPnl(row).opex_usd_m;
+    if (!within(modeledOpex, impliedOpex, 2)) {
+      findings.push({
+        check: "I3",
+        quarter: row.quarter,
+        message: `modeled opex ${modeledOpex.toFixed(1)}M vs implied ${impliedOpex.toFixed(1)}M (outside ±2%)`,
       });
     }
   }
