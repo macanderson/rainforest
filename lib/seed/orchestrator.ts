@@ -106,6 +106,16 @@ export interface SeedHandle {
    * (lib/db/columns.ts). Returns the new rowid.
    */
   insert(table: string, row: Record<string, unknown>): number;
+  /**
+   * Overwrite columns on one already-seeded row, by rowid.
+   *
+   * Some seeded columns are aggregates of rows that do not exist yet when
+   * their parent is written — a supplier's realized SLA summarizes purchase
+   * orders generated over the following 23 quarters. Those need a write-back
+   * pass, so the walk offers one. Updates create nothing, so they do not
+   * count toward `rowsByTable`.
+   */
+  update(table: string, id: number, row: Record<string, unknown>): void;
 }
 
 export interface SeedRunSummary {
@@ -219,6 +229,21 @@ export function runSeed(
         .lastInsertRowid as number;
       counts.set(table, (counts.get(table) ?? 0) + 1);
       return id;
+    },
+    update(table, id, row) {
+      const columns = Object.keys(row);
+      // "u|" keeps update shapes from colliding with the insert shape for the
+      // same table and column set, which prepares to different SQL.
+      const key = `u|${table}|${columns.join(",")}`;
+      let stmt = statements.get(key);
+      if (!stmt) {
+        stmt = sqlite.prepare(
+          `UPDATE ${table} SET ${columns.map((c) => `${c} = ?`).join(", ")} ` +
+            `WHERE id = ?`,
+        );
+        statements.set(key, stmt);
+      }
+      stmt.run(...columns.map((c) => row[c] as never), id);
     },
   };
 
