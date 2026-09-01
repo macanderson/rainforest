@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: typecheck / lint / test / build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (cached)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # The palette rule (palette/no-off-palette-colors, #11) is wired into
+      # eslint.config.mjs, so this stage enforces it.
+      - name: Lint (palette rule included)
+        run: npm run lint -- --max-warnings 0
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+  reconcile:
+    # CI-blocking whenever the numbers bible or seed code changes
+    # (docs/data-specs/reconciliation.md). Job-level `if` cannot use path
+    # filters, so the filter runs as a step and gates the rest of the job.
+    name: reconcile (data/ or seed code changed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            data:
+              - 'data/**'
+              - 'drizzle/**'
+              - 'lib/db/**'
+              - 'lib/reconcile.mjs'
+              - 'drizzle.config.ts'
+
+      - name: Skip — no data or seed-code changes
+        if: steps.changes.outputs.data != 'true'
+        run: echo "reconcile not required for this change set"
+
+      - uses: actions/setup-node@v4
+        if: steps.changes.outputs.data == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (cached)
+        if: steps.changes.outputs.data == 'true'
+        run: npm ci
+
+      - name: pnpm reconcile (CI-blocking)
+        if: steps.changes.outputs.data == 'true'
+        run: npm run reconcile
+
+      - name: Upload reconcile report
+        if: steps.changes.outputs.data == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reconcile-report
+          path: reconcile-report.txt
+          if-no-files-found: error
