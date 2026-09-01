@@ -55,7 +55,10 @@ jobs:
               - 'data/**'
               - 'drizzle/**'
               - 'lib/db/**'
+              - 'lib/seed.mjs'
+              - 'lib/seed.ts'
               - 'lib/reconcile.mjs'
+              - 'lib/reconcile.ts'
               - 'drizzle.config.ts'
             docker:
               - 'Dockerfile'
