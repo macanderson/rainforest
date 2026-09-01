@@ -1,0 +1,23 @@
+# Local prod-parity compose file (issue #15) — reproduces the Lightsail
+# topology from architecture.md §7.2: the app on :3000 with the SQLite file on
+# a volume mount at /var/lib/rainforest/rainforest.db. Caddy terminates TLS in
+# front of this in prod; locally, hit the app directly on http://localhost:3000.
+#
+#   docker compose up --build
+#   curl http://localhost:3000/api/health
+#
+# Data persists across `docker compose restart` because the database lives in
+# the named volume, not the image.
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_PATH: /var/lib/rainforest/rainforest.db
+    volumes:
+      - rainforest-data:/var/lib/rainforest
+    restart: unless-stopped
+
+volumes:
+  rainforest-data:

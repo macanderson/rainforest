@@ -57,6 +57,12 @@ jobs:
               - 'lib/db/**'
               - 'lib/reconcile.mjs'
               - 'drizzle.config.ts'
+            docker:
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'docker-compose.yml'
+              - 'docker-entrypoint.mjs'
+              - 'next.config.ts'
 
       - name: Skip — no data or seed-code changes
         if: steps.changes.outputs.data != 'true'
@@ -83,3 +89,40 @@ jobs:
           name: reconcile-report
           path: reconcile-report.txt
           if-no-files-found: error
+
+  docker:
+    # Image build gate for PRs touching the Dockerfile/compose files (#15) —
+    # proves the production image still builds without paying for a build on
+    # every PR. Deploy/push to a registry is E7 follow-up work.
+    name: docker build (Dockerfile/compose changed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'docker-compose.yml'
+              - 'docker-entrypoint.mjs'
+              - 'next.config.ts'
+
+      - name: Skip — no Dockerfile/compose changes
+        if: steps.changes.outputs.docker != 'true'
+        run: echo "docker build not required for this change set"
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.changes.outputs.docker == 'true'
+
+      - name: Build production image
+        if: steps.changes.outputs.docker == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: rainforest:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
