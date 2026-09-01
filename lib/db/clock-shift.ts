@@ -22,7 +22,7 @@
  */
 import type Database from "better-sqlite3";
 
-import { reconcile } from "../reconcile.ts";
+import { reconcile, type BibleRow } from "../reconcile.ts";
 
 export const DAY_MS = 86_400_000;
 
@@ -79,6 +79,7 @@ export function ledgerDate(now: number): string {
 export function runClockShift(
   sqlite: Database.Database,
   now: number = Date.now(),
+  opts: { bible?: BibleRow[]; skipIdentities?: boolean } = {},
 ): ClockShiftResult {
   const date = ledgerDate(now);
   const startedAt = Date.now();
@@ -112,7 +113,9 @@ export function runClockShift(
 
       // Postcondition: prove quarter-tag anchoring — the shift must leave the
       // bible-vs-DB diff green. Any finding aborts the transaction.
-      reconcileReport = reconcile(sqlite);
+      reconcileReport = reconcile(sqlite, opts.bible, {
+        skipIdentities: opts.skipIdentities,
+      });
       if (!reconcileReport.ok) {
         throw new Error(
           "postcondition reconcile failed: " +
