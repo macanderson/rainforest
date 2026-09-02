@@ -139,6 +139,14 @@ const RAW_INSERT_ALLOWLIST: Record<string, string> = {
     "agent_actions ledger row in the same transaction as the mutation it governs, with an " +
     "explicit 'agent' origin inside the agent-role session it opens — the .insert call sites " +
     "here ARE the sanctioned agent write path",
+  "lib/agents/tick.ts":
+    "the scheduler-side tick runner (architecture §9.2): the run-ledger row is written through " +
+    "the raw handle with an explicit 'agent' origin — like demo-wipe/clock-shift ledger rows, " +
+    "this is a system-writer ledger insert, not a domain mutation",
+  "tests/agent-runs-migration.test.mjs":
+    "exercises the agent_runs migration CHECK constraint with a raw SQL fixture",
+  "tests/agents-scheduler.test.mjs":
+    "reads agent_runs ledger rows back with raw SQL to test the scheduler wiring",
   "tests/agent-framework.test.mjs":
     "seeds category/supplier backbone fixtures with raw SQL to exercise the framework",
   "lib/db/migrate.mjs": "migration runner; ledger rows are stamped 'seed' explicitly",

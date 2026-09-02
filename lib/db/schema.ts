@@ -137,6 +137,13 @@ export const JOB_RUN_STATUSES = [
 export const JOB_RUN_OUTCOMES = ["success", "failure", "no-op"] as const;
 
 /**
+ * Run-ledger outcomes for the operational-agent ticks (architecture §9.2).
+ * `dry_run` is its own outcome so the observability page can tell a real
+ * success from a recorded dry-run tick without reading the detail JSON.
+ */
+export const AGENT_RUN_OUTCOMES = ["success", "failure", "dry_run"] as const;
+
+/**
  * Ledger of applied migrations. The runner (lib/db/migrate.mjs) records each
  * applied migration here so re-runs are no-ops and the applied set is
  * inspectable from SQL.
@@ -517,6 +524,39 @@ export const jobRuns = sqliteTable(
     dataOriginCheck,
     index("job_runs_job_idx").on(t.job),
     index("job_runs_started_idx").on(t.startedAt),
+  ],
+);
+
+/**
+ * Run ledger for the operational-agent ticks (architecture §9.2, E5#5). Every
+ * cron-triggered tick of auto-reorder / fulfillment / exception records one
+ * row here: agent, started/finished timestamps, outcome, dry-run flag, and a
+ * JSON detail payload (actions taken, duration, error). The job observability
+ * page (E6#4) surfaces this table. No hard FKs: the ledger must survive every
+ * wipe.
+ */
+export const agentRuns = sqliteTable(
+  "agent_runs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    agent: text("agent", { enum: AGENT_NAMES }).notNull(),
+    /**
+     * `success` | `failure` | `dry_run` — a dry-run tick is its own outcome,
+     * never a "success". (Drizzle CHECK support is limited to the shared
+     * data-origin constraint; the migration adds the outcome CHECK.)
+     */
+    outcome: text("outcome", { enum: AGENT_RUN_OUTCOMES }).notNull(),
+    dryRun: integer("dry_run", { mode: "boolean" }).notNull().default(false),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+    /** JSON payload: actions taken (verb, key, reason, entity), duration, error. */
+    detailJson: text("detail_json"),
+    ...sharedColumns,
+  },
+  (t) => [
+    dataOriginCheck,
+    index("agent_runs_agent_idx").on(t.agent),
+    index("agent_runs_started_idx").on(t.startedAt),
   ],
 );
 
