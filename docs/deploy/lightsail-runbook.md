@@ -67,7 +67,7 @@ The script is idempotent (safe to re-run) and performs, in order:
 4. **Service setup** — installs and enables a `rainforest.service` systemd unit that runs the
    Next.js standalone server (`node server.js`) on `127.0.0.1:3000` with
    `DATABASE_PATH=/var/lib/rainforest/rainforest.db`, `NODE_ENV=production`, and the secrets
-   (`SESSION_SECRET`, `AGENT_SECRET`/`CRON_SECRET`) read from `/etc/rainforest/env` (mode 0600,
+   (`SESSION_SECRET`, `AGENT_SECRET`/`CRON_SECRET`) read from `/etc/rainforest/.env` (mode 0600,
    generated on first run with random values if absent). The unit restarts on failure and starts
    after network + Caddy.
 5. **Cron** — installs the system crontab entries from [docs/crontab.md](../crontab.md): agent
