@@ -195,6 +195,11 @@ SQLite database file, and system cron, with Caddy terminating TLS.**
 
 ### 7.2 Topology
 
+Provisioning: [docs/deploy/lightsail-runbook.md](deploy/lightsail-runbook.md) — the account-side
+facts (instance, static IP, firewall, sslip.io hostname) plus the one-command provisioning script
+([scripts/provision-lightsail.sh](../scripts/provision-lightsail.sh)) that installs Caddy, lays out
+`/var/lib/rainforest/`, and wires the service and crontab.
+
 ```
 [ Lightsail 2 GB, static IP, firewall 80/443/22 ]
   Caddy (TLS, reverse proxy :443 → :3000)
